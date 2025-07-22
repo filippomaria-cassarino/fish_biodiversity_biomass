@@ -1,46 +1,19 @@
-### INFO ----
+---
+title: "markdown.test"
+output: html_document
+date: "`r Sys.Date()`"
+---
 
-## Author:  Filippomaria Cassarino
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-## Date last modified:  17 jul 2025
-
-## Description:
-# This script explores and filters the original community data
-
-## NOTES
-# 1 move mapping_objects code
-# 2 use new equal area projection (better for mapping with grids rather than points)
-
-
-
-### LIBRARY ----
-Sys.setenv(LANG = "en")
-setwd("C:/Users/User/OneDrive - UGent/Desktop/Rstuff/master_paper")
-
+```{r pressure, echo=FALSE}
 library(dplyr)
-library(tidyr) # replace_na function
 library(ggplot2)
-library(vegan)
-
-library(GGally) # collinearity plot
-library(ape)
-library(gawdis)
-library(purrr)
-library(tibble) # column and row names
-
-library(hypervolume)
-library(BAT)
-library(fundiversity) # modern FD, compare with BAT
-library(mFD) # how many pcoas to retain
-
-library(terra)
 library(sf)
-library(rnaturalearth) # land shape, better and faster than mapdata
-
-library(modi) # to compute cwv
-
-library(forcats) # PCoA plot
-library(ggrepel) # PCoA plot
+library(terra)
+library(rnaturalearth)
 
 ## mapping objects
 # land contours
@@ -227,3 +200,8 @@ p <- ggplot() +
 ggsave(p, file = paste0("doc/biomass_plots/haul_number.png"),
          width = 15, height = 10, units = "cm")
 
+
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

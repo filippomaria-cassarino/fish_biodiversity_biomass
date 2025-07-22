@@ -1,0 +1,98 @@
+Trait;Unit and modes;Explanations
+family;-;Accepted name from the World Register of Marine Species
+genus;-;Accepted name from the World Register of Marine Species
+species;-;Accepted name from the World Register of Marine Species
+taxonomic.rank;S:species;
+;G:genus;
+;F:family;
+taxon;-;Taxonomic name
+LME;-;Large Marine Ecosystem (LME)
+FAO;;Food and Agriculature Organization (FAO) fishing areas
+habitat;;Zone of the water column used by the taxon
+;bathydemersal;
+;bathypelagic;
+;benthopelagic;
+;demersal;Used in reference to the body shape of a fish which is cylindrical or nearly so and tapers toward the ends
+;non-pelagic;Assigned to high taxonomic ranks if several non-pelagic habitats are valid
+;pelagic;
+;reef-associated;
+reference.habitat;;
+feeding.mode;;Main food source from stomach contents and biological descriptions of adults
+;benthivorous;
+;generalist;Combination of two or more categories
+;herbivorous;
+;no category assigned;Assigned to genus and family taxons for which several categories were equally present within that group
+;piscivorous;
+;planktivorous;
+;unknown;No information found
+reference.feeding.mode;;
+trophic.level;-;"Based on the proportion of different prey in stomach; if not available, based on the occurrence of prey "
+level.trophic.level;;Taxonomic and geographic level (description below)
+reference.trophic.level;;
+body.shape;;Main lateral or cross-sectional body shape
+;compressiform;Laterally compressed body
+;eel-like;
+;elongated;
+;flat;
+;fusiform;
+;short and/or deep;
+fin.shape;;Caudal fin shape
+;forked;
+;heterocercal;
+;lunate;
+;truncate;
+;pointed;
+;rounded;
+aspect.ratio;-;Ratio between the squared height of the caudal fin and its surface
+level.aspect.ratio;;Taxonomic and geographic level (description below)
+reference.aspect.ratio;;
+offspring.size;mm;Diameter of the released eggs, length of the egg case or length of the young
+level.offpsring.size;;Taxonomic and geographic level (description below)
+reference.offspring.size;;
+;Reference key;
+;Inferred from genus/family;Inferred from the species in the same genus or family in the database
+spawning.type;;Type of spawning related to parental care
+;bearer;External brooders and internal live bearers
+;external bearer;
+;guarder;Clutch tenders and nesters
+;hider;
+;internal bearer;
+;internal live bearer;
+;nester;
+;nonguarder;Spawning in open water, on substratum and hiders
+;open water/substratum;
+reference.spawning.type;;
+age.maturity;years;First age at which the individual is able to reproduce
+level.age.maturity;;Taxonomic and geographic level (description below)
+reference.age.maturity;;Inferred from genus' is inferred from the species in the same genus and 'Inferred from family' is inferred from species in the same family
+fecundity;number of offspring;Number of offspring per female per batch or per year
+level.fecundity;;Taxonomic and geographic level (description below)
+reference.fecundity;;
+length.infinity;cm;Infinity length parameter estimated from the Von Bertalanffy equation
+growth.coefficient;/year;Growth coefficient K estimated from the Von Bertalanffy equation
+level.growth;;Taxonomic and geographic level (description below)
+reference.growth;;Inferred from genus' is inferred from the species in the same genus and 'Inferred from family' is inferred from species in the same family
+length.max;cm;Maximum length reported
+level.length.max;;Taxonomic and geographic level (description below)
+reference.length.max;;
+age.max;years;Longevity
+level.age.max;;Taxonomic and geographic level (description below)
+reference.age.max;;
+;;
+;;
+;;
+;;
+;;
+Level used for selection of trait;Taxon level;Geographic level
+spe;species;
+spe-LME;species;LME
+spe-FAO;species;FAO
+spe-ocean;species;World Ocean
+gen;genus;
+gen-LME;genus;LME
+gen-FAO;genus;FAO
+gen-ocean;genus;World Ocean
+fam;family;
+fam-LME;family;LME
+fam-FAO;family;FAO
+fam-ocean;family;World Ocean
