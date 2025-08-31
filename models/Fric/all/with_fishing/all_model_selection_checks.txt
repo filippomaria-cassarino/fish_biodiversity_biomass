@@ -1,0 +1,79 @@
+
+MODEL SELECTION CHECKS (all model)
+
+---------------------------------------------------------------------
+
+RANDOM TERM
+
+All models in the random-term selection passed sanity checks.
+
+Selected random structure: spatiotemporal_random_fields_ar1 
+
+---------------------------------------------------------------------
+
+FIXED TERM
+
+Sanity check failed for the following fixed-term models:
+model_without_sbt_mean 
+
+Selected fixed structure:
+Fric ~ sbt_mean + sic_mean 
+
+---------------------------------------------------------------------
+
+COLLINEARITY AMONG COVARIATES
+
+No collinearity detected among covariates (VIF < 2).
+
+---------------------------------------------------------------------
+
+AIC SCORES
+
+Random-term selection AIC table:
+                                                 df      AIC   delta_AIC
+spatiotemporal_random_fields_ar1                 13 4722.355   0.2630783
+spatiotemporal_random_fields_ar1_with_anisotropy 15 4722.618   7.6452373
+spatiotemporal_random_fields_iid_with_anisotropy 14 4730.263   1.1806666
+spatiotemporal_random_fields_iid                 12 4731.444  37.7942773
+spatial_random_fields                            11 4769.238   1.9285183
+spatial_random_fields_with_anisotropy            13 4771.167 149.4541021
+error_only                                        9 4920.621          NA
+
+Fixed-term selection AIC table:
+                                                            model      AIC  delta_AIC        var_removed
+model_without_sbt_mean                     model_without_sbt_mean 4745.699 57.5308117           sbt_mean
+model_without_sic_mean                     model_without_sic_mean 4691.972  3.8039325           sic_mean
+model_without_log_fishing_effort model_without_log_fishing_effort 4689.114  0.9455146 log_fishing_effort
+model_without_sst_sd                         model_without_sst_sd 4687.147 -1.0215041             sst_sd
+model_without_log_chla_mean           model_without_log_chla_mean 4687.069 -1.0993849      log_chla_mean
+model_without_depth                           model_without_depth 4686.700 -1.4681758              depth
+model_without_sbt_sd                         model_without_sbt_sd 4686.257 -1.9108918             sbt_sd
+
+---------------------------------------------------------------------
+
+MODEL
+
+all model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: Fric ~ sbt_mean + sic_mean
+Mesh: mesh (isotropic covariance)
+Time column: year
+Data: data
+Family: gaussian(link = 'identity')
+ 
+Conditional model:
+            coef.est coef.se
+(Intercept)     0.01    0.17
+sbt_mean        0.06    0.07
+sic_mean       -0.15    0.06
+
+Dispersion parameter: 0.84
+Spatiotemporal AR1 correlation (rho): 0.71
+Matérn range: 252.05
+Spatial SD: 0.53
+Spatiotemporal marginal AR1 SD: 0.40
+REML criterion at convergence: 2338.630
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+
+---------------------------------------------------------------------

@@ -1,0 +1,78 @@
+
+MODEL SELECTION CHECKS (arctic model)
+
+---------------------------------------------------------------------
+
+RANDOM TERM
+
+Sanity check failed for the following random-term models:
+spatiotemporal_random_fields_ar1, spatiotemporal_random_fields_ar1_with_anisotropy 
+
+Selected random structure: spatiotemporal_random_fields_ar1 
+
+---------------------------------------------------------------------
+
+FIXED TERM
+
+Sanity check failed for the following fixed-term models:
+model_without_sbt_sd, model_without_sst_sd, model_without_sic_mean, model_without_sic_sd, model_without_log_chla_mean, model_without_depth 
+
+Selected fixed structure:
+Teve ~ 1 
+
+---------------------------------------------------------------------
+
+COLLINEARITY AMONG COVARIATES
+
+No collinearity detected among covariates (VIF < 2).
+
+---------------------------------------------------------------------
+
+AIC SCORES
+
+Random-term selection AIC table:
+                                                 df      AIC delta_AIC
+spatiotemporal_random_fields_ar1                 13 2506.899  3.842737
+spatiotemporal_random_fields_ar1_with_anisotropy 15 2510.742  5.911387
+spatiotemporal_random_fields_iid                 12 2516.654  1.846865
+spatiotemporal_random_fields_iid_with_anisotropy 14 2518.500 29.843265
+spatial_random_fields                            11 2548.344  1.968481
+spatial_random_fields_with_anisotropy            13 2550.312 20.327520
+error_only                                        9 2570.640        NA
+
+Fixed-term selection AIC table:
+                                                  model      AIC   delta_AIC   var_removed
+model_without_sst_sd               model_without_sst_sd 2542.722  -0.9173812        sst_sd
+model_without_log_chla_mean model_without_log_chla_mean 2542.386  -1.2531330 log_chla_mean
+model_without_depth                 model_without_depth 2541.944  -1.6956952         depth
+model_without_sbt_mean           model_without_sbt_mean 2493.652 -49.9873254      sbt_mean
+model_without_sic_sd               model_without_sic_sd 2479.443 -64.1965034        sic_sd
+model_without_sbt_sd               model_without_sbt_sd 2478.462 -65.1775311        sbt_sd
+model_without_sic_mean           model_without_sic_mean 2477.985 -65.6547653      sic_mean
+
+---------------------------------------------------------------------
+
+MODEL
+
+arctic model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: Teve ~ 1
+Mesh: mesh (isotropic covariance)
+Time column: year
+Data: data
+Family: gaussian(link = 'identity')
+ 
+Conditional model:
+            coef.est coef.se
+(Intercept)     -0.3    0.15
+
+Dispersion parameter: 0.94
+Spatiotemporal AR1 correlation (rho): 0.84
+Matérn range: 202.16
+Spatial SD: 0.32
+Spatiotemporal marginal AR1 SD: 0.44
+REML criterion at convergence: 1239.473
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+
+---------------------------------------------------------------------

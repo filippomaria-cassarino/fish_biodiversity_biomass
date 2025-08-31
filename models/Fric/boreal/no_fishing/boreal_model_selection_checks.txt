@@ -1,0 +1,78 @@
+
+MODEL SELECTION CHECKS (boreal model)
+
+---------------------------------------------------------------------
+
+RANDOM TERM
+
+Sanity check failed for the following random-term models:
+spatial_random_fields_with_anisotropy, spatiotemporal_random_fields_iid_with_anisotropy, spatiotemporal_random_fields_ar1, spatiotemporal_random_fields_ar1_with_anisotropy 
+
+Selected random structure: spatiotemporal_random_fields_ar1_with_anisotropy 
+
+---------------------------------------------------------------------
+
+FIXED TERM
+
+Sanity check failed for the following fixed-term models:
+model_without_sbt_mean, model_without_sbt_sd, model_without_sst_sd, model_without_log_chla_mean 
+
+Selected fixed structure:
+Fric ~ 1 
+
+---------------------------------------------------------------------
+
+COLLINEARITY AMONG COVARIATES
+
+No collinearity detected among covariates (VIF < 2).
+
+---------------------------------------------------------------------
+
+AIC SCORES
+
+Random-term selection AIC table:
+                                                 df      AIC delta_AIC
+spatiotemporal_random_fields_ar1_with_anisotropy 12 2558.916  5.386231
+spatiotemporal_random_fields_ar1                 10 2564.302 13.445962
+spatiotemporal_random_fields_iid_with_anisotropy 11 2577.748  4.676039
+spatiotemporal_random_fields_iid                  9 2582.424  7.533592
+spatial_random_fields                             8 2589.958  1.720442
+spatial_random_fields_with_anisotropy            10 2591.678 11.327618
+error_only                                        6 2603.006        NA
+
+Fixed-term selection AIC table:
+                                                  model      AIC   delta_AIC   var_removed
+model_without_sbt_sd               model_without_sbt_sd 2580.981   0.9664562        sbt_sd
+model_without_sst_sd               model_without_sst_sd 2580.253   0.2382461        sst_sd
+model_without_log_chla_mean model_without_log_chla_mean 2578.129  -1.8855166 log_chla_mean
+model_without_sbt_mean           model_without_sbt_mean 2544.628 -35.3864954      sbt_mean
+
+---------------------------------------------------------------------
+
+MODEL
+
+boreal model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: Fric ~ 1
+Mesh: mesh (anisotropic covariance)
+Time column: year
+Data: data
+Family: gaussian(link = 'identity')
+ 
+Conditional model:
+            coef.est coef.se
+(Intercept)     -0.2    0.14
+
+Dispersion parameter: 1.00
+Spatiotemporal AR1 correlation (rho): 0.91
+Matérn anisotropic range (spatial): 0.0 to 7644.9 at 166 deg.
+Spatial SD: 0.00
+Spatiotemporal marginal AR1 SD: 7.77
+REML criterion at convergence: 1270.675
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+See ?plot_anisotropy to plot the anisotropic range.
+
+**Possible issues detected! Check output of sanity().**
+
+---------------------------------------------------------------------

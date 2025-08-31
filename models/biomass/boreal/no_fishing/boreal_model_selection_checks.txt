@@ -1,0 +1,85 @@
+
+MODEL SELECTION CHECKS (boreal model)
+
+---------------------------------------------------------------------
+
+RANDOM TERM
+
+Sanity check failed for the following random-term models:
+spatial_random_fields_with_anisotropy 
+
+Selected random structure: spatiotemporal_random_fields_ar1_with_anisotropy 
+
+---------------------------------------------------------------------
+
+FIXED TERM
+
+Sanity check failed for the following fixed-term models:
+model_without_Fric, model_without_Feve, model_without_Tric, model_without_Teve, model_without_sbt_sd, model_without_sst_sd, model_without_log_chla_mean 
+
+Selected fixed structure:
+total_biomass ~ Fric + Feve + Tric + Teve + sbt_sd 
+
+---------------------------------------------------------------------
+
+COLLINEARITY AMONG COVARIATES
+
+No collinearity detected among covariates (VIF < 2).
+
+---------------------------------------------------------------------
+
+AIC SCORES
+
+Random-term selection AIC table:
+                                                 df      AIC  delta_AIC
+spatiotemporal_random_fields_ar1_with_anisotropy 16 14193.43  2.2374993
+spatiotemporal_random_fields_iid_with_anisotropy 15 14195.67  2.2000951
+spatiotemporal_random_fields_ar1                 14 14197.87  0.8743902
+spatiotemporal_random_fields_iid                 13 14198.74 73.0689563
+spatial_random_fields                            12 14271.81  1.3424858
+spatial_random_fields_with_anisotropy            14 14273.15 23.3406535
+error_only                                       10 14296.49         NA
+
+Fixed-term selection AIC table:
+                                                  model      AIC   delta_AIC   var_removed
+model_without_Teve                   model_without_Teve 14431.55 167.6246920          Teve
+model_without_Tric                   model_without_Tric 14316.84  52.9107984          Tric
+model_without_sbt_sd               model_without_sbt_sd 14285.53  21.6041542        sbt_sd
+model_without_Fric                   model_without_Fric 14276.02  12.0955495          Fric
+model_without_Feve                   model_without_Feve 14274.04  10.1168894          Feve
+model_without_log_chla_mean model_without_log_chla_mean 14264.08   0.1558605 log_chla_mean
+model_without_sst_sd               model_without_sst_sd 14262.22  -1.7015277        sst_sd
+model_without_sbt_mean           model_without_sbt_mean 14174.90 -89.0254201      sbt_mean
+
+---------------------------------------------------------------------
+
+MODEL
+
+boreal model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: total_biomass ~ Fric + Feve + Tric + Teve + sbt_sd
+Mesh: mesh (anisotropic covariance)
+Time column: year
+Data: data
+Family: lognormal(link = 'log')
+ 
+Conditional model:
+            coef.est coef.se
+(Intercept)     7.32    0.33
+Fric           -0.09    0.03
+Feve            0.00    0.04
+Tric            0.17    0.03
+Teve           -0.46    0.04
+sbt_sd          0.23    0.07
+
+Dispersion parameter: 0.65
+Spatiotemporal AR1 correlation (rho): 0.38
+Matérn anisotropic range (spatial): 79.5 to 993.0 at 165 deg.
+Spatial SD: 0.70
+Spatiotemporal marginal AR1 SD: 0.39
+REML criterion at convergence: 7085.541
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+See ?plot_anisotropy to plot the anisotropic range.
+
+---------------------------------------------------------------------
