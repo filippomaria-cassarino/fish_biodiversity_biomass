@@ -2,5 +2,9 @@
 .Rhistory
 .RData
 .Ruserdata
-data/original
+data/original/cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M_1738579225409.nc
+data/original/cmems_mod_glo_phy_my_0.083deg_P1M-m_1738920541876.nc
+data/original/cmems_mod_glo_phy_myint_0.083deg_P1M-m_1741103917033.nc
+data/original/Ellingsen2025_data_biogeographical
+data/original/effort_gfw_0.01_monthly.csv
 testing/
