@@ -2,7 +2,5 @@
 .Rhistory
 .RData
 .Ruserdata
-data/intermediate
 data/original
-models/
 testing/

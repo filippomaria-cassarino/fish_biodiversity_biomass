@@ -1,0 +1,56 @@
+
+MODEL SELECTION CHECKS (general_Fdis model)
+
+---------------------------------------------------------------------
+
+RANDOM TERM
+
+All models in the random-term selection passed sanity checks.
+
+Selected random structure: spatiotemporal_random_fields_ar1_with_anisotropy 
+
+---------------------------------------------------------------------
+
+FIXED TERM
+
+Random-term selection AIC table:
+                                                 df      AIC   delta_AIC
+spatiotemporal_random_fields_ar1_with_anisotropy 14 8896.415   4.7073440
+spatiotemporal_random_fields_ar1                 12 8901.123  60.7760285
+spatiotemporal_random_fields_iid_with_anisotropy 13 8961.899   5.9662800
+spatiotemporal_random_fields_iid                 11 8967.865 117.5333409
+spatial_random_fields_with_anisotropy            12 9085.398   0.2299779
+spatial_random_fields                            10 9085.628 423.3345964
+error_only                                        8 9508.963          NA
+
+---------------------------------------------------------------------
+
+MODEL
+
+general_Fdis model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: fixed_formula
+Time column: year
+Family: gaussian(link = 'identity')
+ 
+Conditional model:
+              coef.est coef.se
+(Intercept)      -0.07    0.18
+sbt_mean          0.09    0.05
+sbt_sd            0.08    0.03
+sst_sd            0.03    0.02
+sic_mean         -0.13    0.05
+log_chla_mean     0.01    0.02
+depth             0.02    0.03
+
+Dispersion parameter: 0.82
+Spatiotemporal AR1 correlation (rho): 0.88
+Matérn anisotropic range (spatial): 168.2 to 505.3 at 172 deg.
+Spatial SD: 0.47
+Spatiotemporal marginal AR1 SD: 0.49
+REML criterion at convergence: 4434.208
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+See ?plot_anisotropy to plot the anisotropic range.
+
+---------------------------------------------------------------------

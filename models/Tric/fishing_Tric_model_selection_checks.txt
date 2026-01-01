@@ -1,0 +1,56 @@
+
+MODEL SELECTION CHECKS (fishing_Tric model)
+
+---------------------------------------------------------------------
+
+RANDOM TERM
+
+All models in the random-term selection passed sanity checks.
+
+Selected random structure: spatiotemporal_random_fields_ar1 
+
+---------------------------------------------------------------------
+
+FIXED TERM
+
+Random-term selection AIC table:
+                                                 df      AIC  delta_AIC
+spatiotemporal_random_fields_ar1                 13 4382.072   3.686015
+spatiotemporal_random_fields_ar1_with_anisotropy 15 4385.758   3.660489
+spatiotemporal_random_fields_iid                 12 4389.418   3.688648
+spatiotemporal_random_fields_iid_with_anisotropy 14 4393.107 197.876902
+spatial_random_fields                            11 4590.984   3.602098
+spatial_random_fields_with_anisotropy            13 4594.586 292.298057
+error_only                                        9 4886.884         NA
+
+---------------------------------------------------------------------
+
+MODEL
+
+fishing_Tric model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: fixed_formula
+Time column: year
+Family: gaussian(link = 'identity')
+ 
+Conditional model:
+                   coef.est coef.se
+(Intercept)            0.02    0.42
+sbt_mean               0.31    0.08
+sbt_sd                -0.14    0.04
+sst_sd                -0.01    0.04
+sic_mean              -0.03    0.07
+log_chla_mean         -0.05    0.03
+depth                 -0.10    0.03
+log_fishing_effort     0.08    0.02
+
+Dispersion parameter: 0.75
+Spatiotemporal AR1 correlation (rho): 0.52
+Matérn range: 469.16
+Spatial SD: 0.81
+Spatiotemporal marginal AR1 SD: 0.39
+REML criterion at convergence: 2178.036
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+
+---------------------------------------------------------------------

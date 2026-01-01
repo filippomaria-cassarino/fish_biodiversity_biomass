@@ -1,0 +1,59 @@
+
+MODEL SELECTION CHECKS (arctic_biomass model)
+
+---------------------------------------------------------------------
+
+RANDOM TERM
+
+All models in the random-term selection passed sanity checks.
+
+Selected random structure: spatiotemporal_random_fields_ar1_with_anisotropy 
+
+---------------------------------------------------------------------
+
+FIXED TERM
+
+Random-term selection AIC table:
+                                                 df      AIC  delta_AIC
+spatiotemporal_random_fields_ar1_with_anisotropy 17 13657.36  11.882184
+spatiotemporal_random_fields_ar1                 15 13669.24   8.417943
+spatiotemporal_random_fields_iid_with_anisotropy 16 13677.66  15.620902
+spatiotemporal_random_fields_iid                 14 13693.28 102.637254
+spatial_random_fields                            13 13795.92   1.798931
+spatial_random_fields_with_anisotropy            15 13797.72 129.644130
+error_only                                       11 13927.36         NA
+
+---------------------------------------------------------------------
+
+MODEL
+
+arctic_biomass model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: fixed_formula
+Time column: year
+Family: lognormal(link = 'log')
+ 
+Conditional model:
+              coef.est coef.se
+(Intercept)       6.97    0.32
+Fric              0.16    0.05
+Tric              0.01    0.05
+Teve             -0.59    0.05
+sbt_mean          0.16    0.07
+sbt_sd            0.29    0.08
+sst_sd            0.07    0.07
+sic_mean          0.01    0.07
+log_chla_mean    -0.01    0.05
+depth             0.25    0.05
+
+Dispersion parameter: 0.91
+Spatiotemporal AR1 correlation (rho): 0.64
+Matérn anisotropic range (spatial): 52.3 to 1016.3 at 8 deg.
+Spatial SD: 0.75
+Spatiotemporal marginal AR1 SD: 0.90
+REML criterion at convergence: 6811.681
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+See ?plot_anisotropy to plot the anisotropic range.
+
+---------------------------------------------------------------------

@@ -1,0 +1,60 @@
+
+MODEL SELECTION CHECKS (remove_4_biomass model)
+
+---------------------------------------------------------------------
+
+RANDOM TERM
+
+All models in the random-term selection passed sanity checks.
+
+Selected random structure: spatiotemporal_random_fields_ar1_with_anisotropy 
+
+---------------------------------------------------------------------
+
+FIXED TERM
+
+Random-term selection AIC table:
+                                                 df      AIC  delta_AIC
+spatiotemporal_random_fields_ar1_with_anisotropy 18 48142.53   5.139497
+spatiotemporal_random_fields_ar1                 16 48147.67  30.202955
+spatiotemporal_random_fields_iid_with_anisotropy 17 48177.88   3.232009
+spatiotemporal_random_fields_iid                 15 48181.11 151.359565
+spatial_random_fields_with_anisotropy            16 48332.47   4.212506
+spatial_random_fields                            14 48336.68 514.077358
+error_only                                       12 48850.76         NA
+
+---------------------------------------------------------------------
+
+MODEL
+
+remove_4_biomass model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: fixed_formula
+Time column: year
+Family: lognormal(link = 'log')
+ 
+Conditional model:
+              coef.est coef.se
+(Intercept)       6.27    0.57
+Fric              0.16    0.02
+Feve             -0.09    0.02
+Tric              0.36    0.02
+Teve             -0.30    0.03
+sbt_mean          0.24    0.06
+sbt_sd           -0.05    0.04
+sst_sd            0.05    0.03
+sic_mean         -0.03    0.06
+log_chla_mean    -0.02    0.02
+depth             0.07    0.03
+
+Dispersion parameter: 0.94
+Spatiotemporal AR1 correlation (rho): 0.94
+Matérn anisotropic range (spatial): 283.1 to 733.3 at 18 deg.
+Spatial SD: 1.04
+Spatiotemporal marginal AR1 SD: 0.68
+REML criterion at convergence: 24053.267
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+See ?plot_anisotropy to plot the anisotropic range.
+
+---------------------------------------------------------------------

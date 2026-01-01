@@ -94,7 +94,7 @@ p <- ggplot(
   theme_minimal(base_size = 14)
 
 ggsave(p, file = "figures/biomass_plots/top_species_biomass.png",
-       unit = "cm", height = 16, width = 22)
+       unit = "cm", height = 16, width = 25)
 
 rm(plot_data)
 
@@ -150,15 +150,19 @@ p <- ggplot(data = plot_data, aes(x = term, y = estimate, color = model)) +
   scale_y_continuous(limits = c(-.7, .7),
                      breaks = seq(-.5, .5, by = .25)) +
   theme_minimal(base_size = 14) +
-  theme(
-    panel.grid.minor = element_blank()) +
+  theme(     aspect.ratio = 2,
+    panel.grid.minor = element_blank(),
+    #legend.text = element_text(size = 10),
+    #legend.title = element_text(size = 11),
+    #legend.key.size = unit(0.4, "cm")
+  ) +
   labs(
     x = "Model term",
     y = "\nCoefficient ± 1 SE",
-    color = "Model's response")
+    color = "Model")
 
 ggsave(p, file = "figures/model_figures/general_fishing_models.png",
-       unit = "cm", height = 20, width = 20)
+       unit = "cm", height = 20, width = 25)
 
 rm(plot_data)
 
@@ -200,7 +204,7 @@ plot_data$term <- factor(plot_data$term,
                                     "sst_sd","sbt_sd",
                                     "sic_mean","sbt_mean",
                                     "Fric","Feve",
-                                    "Tric","Teve"))
+                                    "Tric","Teve", "log_fishing_effort"))
 
 # Plot
 
@@ -216,18 +220,20 @@ p <- ggplot(data = plot_data, aes(x = term, y = estimate, color = model)) +
                                 "#E69F00",
                                 "#56B4E9")) +
   coord_flip() +
+  scale_x_discrete(drop = FALSE) +
   scale_y_continuous(limits = c(-.7, .7),
                      breaks = seq(-.5, .5, by = .25)) +
   theme_minimal(base_size = 14) +
-  theme(
+  theme(     
+    aspect.ratio = 2,
     panel.grid.minor = element_blank()) +
   labs(
     x = "Model term",
     y = "\nCoefficient ± 1 SE",
-    color = "Model's response")
+    color = "Model")
 
 ggsave(p, file = "figures/model_figures/area_effect.png",
-       unit = "cm", height = 20, width = 20)
+       unit = "cm", height = 20, width = 25)
 
 rm(plot_data)
 
@@ -272,7 +278,7 @@ plot_data$term <- factor(plot_data$term,
                                     "sst_sd","sbt_sd",
                                     "sic_mean","sbt_mean",
                                     "Fric","Feve",
-                                    "Tric","Teve"))
+                                    "Tric","Teve", "log_fishing effort"))
 
 # Plot
 cols <- colorRampPalette(c("darkblue", "lightblue"))(3)
@@ -287,18 +293,19 @@ p <- ggplot(data = plot_data, aes(x = term, y = estimate, color = model)) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   scale_color_manual(values = c("black", cols)) +
   coord_flip() +
+  scale_x_discrete(drop = FALSE) +
   scale_y_continuous(limits = c(-.7, .7),
                      breaks = seq(-.5, .5, by = .25)) +
   theme_minimal(base_size = 14) +
-  theme(
+  theme(     aspect.ratio = 2,
     panel.grid.minor = element_blank()) +
   labs(
     x = "Model term",
     y = "\nCoefficient ± 1 SE",
-    color = "Model's response")
+    color = "Model")
 
 ggsave(p, file = "figures/model_figures/time_period_effect.png",
-       unit = "cm", height = 20, width = 20)
+       unit = "cm", height = 20, width = 25)
 
 rm(plot_data)
 
@@ -335,7 +342,7 @@ plot_data$term <- factor(plot_data$term,
                                     "sst_sd","sbt_sd",
                                     "sic_mean","sbt_mean",
                                     "Fric","Feve",
-                                    "Tric","Teve"))
+                                    "Tric","Teve", "log_fishing_effort"))
 
 # Plot
 cols <- colorRampPalette(c("black", "#2b9348", "#eeef20"))(11)
@@ -350,18 +357,19 @@ p <- ggplot(data = plot_data, aes(x = term, y = estimate, color = model)) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   scale_color_manual(values = cols) +
   coord_flip() +
+  scale_x_discrete(drop = FALSE) +
   scale_y_continuous(limits = c(-.7, .87),
                      breaks = c(seq(-.5, .5, by = .25), .75)) +
   theme_minimal(base_size = 14) +
-  theme(
+  theme(     aspect.ratio = 2,
     panel.grid.minor = element_blank()) +
   labs(
     x = "Model term",
     y = "\nCoefficient ± 1 SE",
-    color = "Model's response")
+    color = "Model")
 
 ggsave(p, file = "figures/model_figures/top_species_removal_effect.png",
-       unit = "cm", height = 20, width = 22) 
+       unit = "cm", height = 20, width = 25) 
 
 rm(plot_data)
 
@@ -422,15 +430,15 @@ for (i in 1:length(vars)) {
     scale_y_continuous(limits = c(-.7, .7),
                        breaks = seq(-.5, .5, by = .25)) +
     theme_minimal(base_size = 14) +
-    theme(
+    theme(     aspect.ratio = 2,
       panel.grid.minor = element_blank()) +
     labs(
       x = "Model term",
       y = "\nCoefficient ± 1 SE",
-      color = "Model's response")
+      color = "Model")
   
-  ggsave(p, file = paste0("figures/model_figures/", vars[i], "_models.png"),
-         unit = "cm", height = 20, width = 20)
+  ggsave(p, file = paste0("figures/model_figures/a_", vars[i], "_models.png"),
+         unit = "cm", height = 20, width = 25)
   
 }
 

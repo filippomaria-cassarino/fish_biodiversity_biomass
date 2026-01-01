@@ -1,0 +1,56 @@
+
+MODEL SELECTION CHECKS (general_Fric model)
+
+---------------------------------------------------------------------
+
+RANDOM TERM
+
+All models in the random-term selection passed sanity checks.
+
+Selected random structure: spatiotemporal_random_fields_ar1_with_anisotropy 
+
+---------------------------------------------------------------------
+
+FIXED TERM
+
+Random-term selection AIC table:
+                                                 df      AIC  delta_AIC
+spatiotemporal_random_fields_ar1_with_anisotropy 14 9225.803   3.980149
+spatiotemporal_random_fields_ar1                 12 9229.784  44.705125
+spatiotemporal_random_fields_iid_with_anisotropy 13 9274.489   6.510497
+spatiotemporal_random_fields_iid                 11 9280.999  86.570229
+spatial_random_fields_with_anisotropy            12 9367.569   1.079995
+spatial_random_fields                            10 9368.649 271.330812
+error_only                                        8 9639.980         NA
+
+---------------------------------------------------------------------
+
+MODEL
+
+general_Fric model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: fixed_formula
+Time column: year
+Family: gaussian(link = 'identity')
+ 
+Conditional model:
+              coef.est coef.se
+(Intercept)      -0.02    0.15
+sbt_mean          0.13    0.05
+sbt_sd            0.05    0.03
+sst_sd            0.03    0.02
+sic_mean         -0.11    0.05
+log_chla_mean     0.00    0.02
+depth             0.06    0.03
+
+Dispersion parameter: 0.87
+Spatiotemporal AR1 correlation (rho): 0.91
+Matérn anisotropic range (spatial): 155.7 to 474.2 at 170 deg.
+Spatial SD: 0.34
+Spatiotemporal marginal AR1 SD: 0.51
+REML criterion at convergence: 4598.902
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+See ?plot_anisotropy to plot the anisotropic range.
+
+---------------------------------------------------------------------

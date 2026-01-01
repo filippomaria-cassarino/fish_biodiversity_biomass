@@ -1,0 +1,55 @@
+
+MODEL SELECTION CHECKS (general_Feve model)
+
+---------------------------------------------------------------------
+
+RANDOM TERM
+
+All models in the random-term selection passed sanity checks.
+
+Selected random structure: spatiotemporal_random_fields_ar1 
+
+---------------------------------------------------------------------
+
+FIXED TERM
+
+Random-term selection AIC table:
+                                                 df      AIC  delta_AIC
+spatiotemporal_random_fields_ar1                 12 9106.976   2.524436
+spatiotemporal_random_fields_ar1_with_anisotropy 14 9109.500  45.504858
+spatiotemporal_random_fields_iid                 11 9155.005   2.222697
+spatiotemporal_random_fields_iid_with_anisotropy 13 9157.228 102.782243
+spatial_random_fields                            10 9260.010   3.532216
+spatial_random_fields_with_anisotropy            12 9263.542 371.856996
+error_only                                        8 9635.399         NA
+
+---------------------------------------------------------------------
+
+MODEL
+
+general_Feve model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: fixed_formula
+Time column: year
+Family: gaussian(link = 'identity')
+ 
+Conditional model:
+              coef.est coef.se
+(Intercept)      -0.05    0.18
+sbt_mean          0.17    0.05
+sbt_sd            0.01    0.03
+sst_sd            0.03    0.03
+sic_mean         -0.06    0.05
+log_chla_mean     0.00    0.02
+depth            -0.20    0.03
+
+Dispersion parameter: 0.84
+Spatiotemporal AR1 correlation (rho): 0.83
+Matérn range: 299.62
+Spatial SD: 0.48
+Spatiotemporal marginal AR1 SD: 0.44
+REML criterion at convergence: 4541.488
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+
+---------------------------------------------------------------------

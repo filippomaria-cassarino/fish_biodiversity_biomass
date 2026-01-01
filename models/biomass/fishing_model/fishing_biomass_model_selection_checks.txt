@@ -1,0 +1,61 @@
+
+MODEL SELECTION CHECKS (fishing_biomass model)
+
+---------------------------------------------------------------------
+
+RANDOM TERM
+
+All models in the random-term selection passed sanity checks.
+
+Selected random structure: spatiotemporal_random_fields_ar1_with_anisotropy 
+
+---------------------------------------------------------------------
+
+FIXED TERM
+
+Random-term selection AIC table:
+                                                 df      AIC  delta_AIC
+spatiotemporal_random_fields_ar1_with_anisotropy 19 28653.17   6.564912
+spatiotemporal_random_fields_ar1                 17 28659.73   1.945681
+spatiotemporal_random_fields_iid_with_anisotropy 18 28661.68   7.655692
+spatiotemporal_random_fields_iid                 16 28669.33 104.554721
+spatial_random_fields                            15 28773.89   1.203113
+spatial_random_fields_with_anisotropy            17 28775.09 114.925807
+error_only                                       13 28890.02         NA
+
+---------------------------------------------------------------------
+
+MODEL
+
+fishing_biomass model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: fixed_formula
+Time column: year
+Family: lognormal(link = 'log')
+ 
+Conditional model:
+                   coef.est coef.se
+(Intercept)            7.12    0.14
+Fric                   0.04    0.03
+Feve                   0.05    0.03
+Tric                   0.05    0.02
+Teve                  -0.40    0.03
+sbt_mean               0.26    0.06
+sbt_sd                 0.05    0.04
+sst_sd                 0.07    0.04
+sic_mean              -0.12    0.06
+log_chla_mean         -0.03    0.03
+depth                 -0.16    0.03
+log_fishing_effort     0.12    0.03
+
+Dispersion parameter: 0.77
+Spatiotemporal AR1 correlation (rho): 0.44
+Matérn anisotropic range (spatial): 129.1 to 619.8 at 24 deg.
+Spatial SD: 0.41
+Spatiotemporal marginal AR1 SD: 0.43
+REML criterion at convergence: 14307.584
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+See ?plot_anisotropy to plot the anisotropic range.
+
+---------------------------------------------------------------------

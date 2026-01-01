@@ -1,0 +1,55 @@
+
+MODEL SELECTION CHECKS (general_Tdiv model)
+
+---------------------------------------------------------------------
+
+RANDOM TERM
+
+All models in the random-term selection passed sanity checks.
+
+Selected random structure: spatiotemporal_random_fields_ar1 
+
+---------------------------------------------------------------------
+
+FIXED TERM
+
+Random-term selection AIC table:
+                                                 df      AIC  delta_AIC
+spatiotemporal_random_fields_ar1                 12 9087.827   3.096106
+spatiotemporal_random_fields_ar1_with_anisotropy 14 9090.923  59.585007
+spatiotemporal_random_fields_iid                 11 9150.508   1.350934
+spatiotemporal_random_fields_iid_with_anisotropy 13 9151.859 222.869889
+spatial_random_fields                            10 9374.729   2.581819
+spatial_random_fields_with_anisotropy            12 9377.311 281.097570
+error_only                                        8 9658.408         NA
+
+---------------------------------------------------------------------
+
+MODEL
+
+general_Tdiv model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: fixed_formula
+Time column: year
+Family: gaussian(link = 'identity')
+ 
+Conditional model:
+              coef.est coef.se
+(Intercept)      -0.06    0.14
+sbt_mean          0.19    0.05
+sbt_sd           -0.09    0.03
+sst_sd           -0.01    0.03
+sic_mean         -0.04    0.05
+log_chla_mean     0.00    0.02
+depth             0.02    0.03
+
+Dispersion parameter: 0.83
+Spatiotemporal AR1 correlation (rho): 0.78
+Matérn range: 268.77
+Spatial SD: 0.40
+Spatiotemporal marginal AR1 SD: 0.48
+REML criterion at convergence: 4531.913
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+
+---------------------------------------------------------------------

@@ -1,0 +1,55 @@
+
+MODEL SELECTION CHECKS (fishing_Tdiv model)
+
+---------------------------------------------------------------------
+
+RANDOM TERM
+
+All models in the random-term selection passed sanity checks.
+
+Selected random structure: spatiotemporal_random_fields_iid 
+
+---------------------------------------------------------------------
+
+FIXED TERM
+
+Random-term selection AIC table:
+                                                 df      AIC   delta_AIC
+spatiotemporal_random_fields_ar1                 13 4801.586   0.3629668
+spatiotemporal_random_fields_iid                 12 4801.949   2.9900827
+spatiotemporal_random_fields_ar1_with_anisotropy 15 4804.939   0.1533056
+spatiotemporal_random_fields_iid_with_anisotropy 14 4805.092  31.5021799
+spatial_random_fields                            11 4836.595   3.0915728
+spatial_random_fields_with_anisotropy            13 4839.686 125.7377671
+error_only                                        9 4965.424          NA
+
+---------------------------------------------------------------------
+
+MODEL
+
+fishing_Tdiv model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: fixed_formula
+Time column: year
+Family: gaussian(link = 'identity')
+ 
+Conditional model:
+                   coef.est coef.se
+(Intercept)           -0.01    0.17
+sbt_mean               0.20    0.08
+sbt_sd                -0.13    0.04
+sst_sd                 0.00    0.04
+sic_mean              -0.08    0.07
+log_chla_mean         -0.01    0.03
+depth                 -0.03    0.04
+log_fishing_effort     0.03    0.03
+
+Dispersion parameter: 0.86
+Matérn range: 279.09
+Spatial SD: 0.54
+Spatiotemporal IID SD: 0.31
+REML criterion at convergence: 2388.975
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+
+---------------------------------------------------------------------

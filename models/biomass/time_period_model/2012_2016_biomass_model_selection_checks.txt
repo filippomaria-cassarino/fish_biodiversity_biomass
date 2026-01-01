@@ -1,0 +1,59 @@
+
+MODEL SELECTION CHECKS (2012_2016_biomass model)
+
+---------------------------------------------------------------------
+
+RANDOM TERM
+
+All models in the random-term selection passed sanity checks.
+
+Selected random structure: spatiotemporal_random_fields_iid_with_anisotropy 
+
+---------------------------------------------------------------------
+
+FIXED TERM
+
+Random-term selection AIC table:
+                                                 df      AIC   delta_AIC
+spatiotemporal_random_fields_ar1_with_anisotropy 18 13095.47   0.7346452
+spatiotemporal_random_fields_iid_with_anisotropy 17 13096.20   3.5298155
+spatiotemporal_random_fields_ar1                 16 13099.73   0.7387024
+spatiotemporal_random_fields_iid                 15 13100.47  14.8999978
+spatial_random_fields_with_anisotropy            16 13115.37   2.0296321
+spatial_random_fields                            14 13117.40 112.6195741
+error_only                                       12 13230.02          NA
+
+---------------------------------------------------------------------
+
+MODEL
+
+2012_2016_biomass model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: fixed_formula
+Time column: year
+Family: lognormal(link = 'log')
+ 
+Conditional model:
+              coef.est coef.se
+(Intercept)       7.09    0.23
+Fric              0.09    0.04
+Feve              0.08    0.04
+Tric              0.09    0.04
+Teve             -0.44    0.04
+sbt_mean          0.33    0.09
+sbt_sd            0.06    0.06
+sst_sd            0.13    0.06
+sic_mean         -0.03    0.09
+log_chla_mean    -0.04    0.04
+depth            -0.04    0.05
+
+Dispersion parameter: 0.82
+Matérn anisotropic range (spatial): 153.3 to 847.5 at 27 deg.
+Spatial SD: 0.55
+Spatiotemporal IID SD: 0.33
+REML criterion at convergence: 6531.101
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+See ?plot_anisotropy to plot the anisotropic range.
+
+---------------------------------------------------------------------

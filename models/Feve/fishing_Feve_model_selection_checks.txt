@@ -1,0 +1,44 @@
+
+MODEL SELECTION CHECKS (fishing_Feve model)
+
+---------------------------------------------------------------------
+
+Manually selected random structure: spatiotemporal_random_fields_iid_with_anisotropy 
+
+---------------------------------------------------------------------
+
+Model passed sanity check: TRUE 
+
+---------------------------------------------------------------------
+
+MODEL
+
+fishing_Feve model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: fixed_formula
+Mesh: mesh (anisotropic covariance)
+Time column: year
+Data: data
+Family: gaussian(link = 'identity')
+ 
+Conditional model:
+                   coef.est coef.se
+(Intercept)           -0.01    0.17
+sbt_mean               0.07    0.07
+sbt_sd                -0.02    0.04
+sst_sd                 0.04    0.04
+sic_mean              -0.16    0.06
+log_chla_mean         -0.01    0.03
+depth                 -0.21    0.04
+log_fishing_effort    -0.01    0.03
+
+Dispersion parameter: 0.87
+Matérn anisotropic range (spatial): 128.9 to 610.1 at 30 deg.
+Spatial SD: 0.55
+Spatiotemporal IID SD: 0.25
+REML criterion at convergence: 2377.833
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+See ?plot_anisotropy to plot the anisotropic range.
+
+---------------------------------------------------------------------

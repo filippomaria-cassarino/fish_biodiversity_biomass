@@ -1,0 +1,55 @@
+
+MODEL SELECTION CHECKS (general_Tric model)
+
+---------------------------------------------------------------------
+
+RANDOM TERM
+
+All models in the random-term selection passed sanity checks.
+
+Selected random structure: spatiotemporal_random_fields_ar1 
+
+---------------------------------------------------------------------
+
+FIXED TERM
+
+Random-term selection AIC table:
+                                                 df      AIC  delta_AIC
+spatiotemporal_random_fields_ar1                 12 8615.139   1.779193
+spatiotemporal_random_fields_ar1_with_anisotropy 14 8616.918  39.600374
+spatiotemporal_random_fields_iid                 11 8656.519   1.963512
+spatiotemporal_random_fields_iid_with_anisotropy 13 8658.482 494.595711
+spatial_random_fields                            10 9153.078   2.194645
+spatial_random_fields_with_anisotropy            12 9155.272 599.255453
+error_only                                        8 9754.528         NA
+
+---------------------------------------------------------------------
+
+MODEL
+
+general_Tric model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: fixed_formula
+Time column: year
+Family: gaussian(link = 'identity')
+ 
+Conditional model:
+              coef.est coef.se
+(Intercept)       0.06    0.45
+sbt_mean          0.22    0.06
+sbt_sd           -0.11    0.03
+sst_sd            0.00    0.03
+sic_mean         -0.02    0.05
+log_chla_mean    -0.03    0.02
+depth             0.03    0.03
+
+Dispersion parameter: 0.76
+Spatiotemporal AR1 correlation (rho): 0.67
+Matérn range: 453.83
+Spatial SD: 0.94
+Spatiotemporal marginal AR1 SD: 0.45
+REML criterion at convergence: 4295.570
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+
+---------------------------------------------------------------------

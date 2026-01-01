@@ -1,0 +1,63 @@
+
+MODEL SELECTION CHECKS (remove_7_biomass model)
+
+---------------------------------------------------------------------
+
+RANDOM TERM
+
+WARNING: model selection should not be trusted
+
+Sanity check failed for the following random structures:
+spatial_random_fields_with_anisotropy 
+
+Selected random structure: spatiotemporal_random_fields_ar1_with_anisotropy 
+
+---------------------------------------------------------------------
+
+FIXED TERM
+
+Random-term selection AIC table:
+                                                 df      AIC delta_AIC
+spatiotemporal_random_fields_ar1_with_anisotropy 18 44326.25  16.85604
+spatiotemporal_random_fields_ar1                 16 44343.11  34.31780
+spatiotemporal_random_fields_iid_with_anisotropy 17 44377.43  17.27306
+spatiotemporal_random_fields_iid                 15 44394.70  57.33550
+spatial_random_fields_with_anisotropy            16 44452.03  15.41027
+spatial_random_fields                            14 44467.44 313.82403
+error_only                                       12 44781.27        NA
+
+---------------------------------------------------------------------
+
+MODEL
+
+remove_7_biomass model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: fixed_formula
+Time column: year
+Family: lognormal(link = 'log')
+ 
+Conditional model:
+              coef.est coef.se
+(Intercept)       5.63    0.15
+Fric              0.29    0.03
+Feve             -0.04    0.03
+Tric              0.58    0.03
+Teve             -0.33    0.03
+sbt_mean          0.29    0.07
+sbt_sd            0.06    0.05
+sst_sd           -0.01    0.04
+sic_mean          0.08    0.06
+log_chla_mean     0.00    0.03
+depth             0.27    0.04
+
+Dispersion parameter: 1.23
+Spatiotemporal AR1 correlation (rho): 0.75
+Matérn anisotropic range (spatial): 48.4 to 453.1 at 25 deg.
+Spatial SD: 0.80
+Spatiotemporal marginal AR1 SD: 0.75
+REML criterion at convergence: 22145.126
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+See ?plot_anisotropy to plot the anisotropic range.
+
+---------------------------------------------------------------------

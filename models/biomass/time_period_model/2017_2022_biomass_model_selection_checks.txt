@@ -1,0 +1,57 @@
+
+MODEL SELECTION CHECKS (2017_2022_biomass model)
+
+---------------------------------------------------------------------
+
+RANDOM TERM
+
+All models in the random-term selection passed sanity checks.
+
+Selected random structure: spatiotemporal_random_fields_iid 
+
+---------------------------------------------------------------------
+
+FIXED TERM
+
+Random-term selection AIC table:
+                                                 df      AIC  delta_AIC
+spatiotemporal_random_fields_iid                 14 15633.14  0.1134724
+spatiotemporal_random_fields_ar1                 15 15633.25  3.7684005
+spatiotemporal_random_fields_iid_with_anisotropy 16 15637.02  0.1644174
+spatiotemporal_random_fields_ar1_with_anisotropy 17 15637.18 44.6701289
+spatial_random_fields                            13 15681.85  1.1641305
+spatial_random_fields_with_anisotropy            15 15683.02 67.5431448
+error_only                                       11 15750.56         NA
+
+---------------------------------------------------------------------
+
+MODEL
+
+2017_2022_biomass model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: fixed_formula
+Time column: year
+Family: lognormal(link = 'log')
+ 
+Conditional model:
+              coef.est coef.se
+(Intercept)       7.15    0.12
+Fric              0.01    0.04
+Feve              0.05    0.04
+Tric              0.00    0.03
+Teve             -0.38    0.04
+sbt_mean          0.36    0.07
+sbt_sd           -0.03    0.05
+sst_sd            0.04    0.05
+log_chla_mean    -0.01    0.04
+depth            -0.26    0.04
+
+Dispersion parameter: 0.72
+Matérn range: 222.31
+Spatial SD: 0.41
+Spatiotemporal IID SD: 0.40
+REML criterion at convergence: 7802.568
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+
+---------------------------------------------------------------------
