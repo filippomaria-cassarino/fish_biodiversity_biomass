@@ -1,0 +1,58 @@
+
+MODEL SELECTION CHECKS (remove_4_biomass model)
+
+-------------------------------------------------------------------
+
+SANITY
+
+OK: all models passed sanity checks.
+
+RANDOM TERM
+
+Selected random structure: spatiotemporal_random_fields_ar1 
+
+-------------------------------------------------------------------
+
+MODEL SUMMARY
+
+remove_4_biomass model
+Spatiotemporal model fit by REML ['sdmTMB']
+Formula: fixed_formula
+Time column: year
+Family: lognormal(link = 'log')
+ 
+Conditional model:
+              coef.est coef.se
+(Intercept)       6.55    1.02
+kde_fric         -0.01    0.02
+kde_feve          0.08    0.02
+tric              0.34    0.02
+teve             -0.28    0.02
+sbt_mean          0.13    0.06
+sbt_sd            0.06    0.03
+sst_sd            0.05    0.03
+sic_mean         -0.07    0.06
+log_chla_mean    -0.07    0.03
+depth             0.02    0.03
+
+Dispersion parameter: 1.02
+Spatiotemporal AR1 correlation (rho): 0.98
+Matérn range: 1003.73
+Spatiotemporal marginal AR1 SD: 1.01
+REML criterion at convergence: 24264.326
+
+See ?tidy.sdmTMB to extract these values as a data frame.
+
+-------------------------------------------------------------------
+
+SELECTION STATISTICS
+
+AIC, ΔAIC, and df table:
+                                                 df      AIC   delta_AIC
+spatiotemporal_random_fields_ar1                 15 48558.65   3.9137819
+spatiotemporal_random_fields_ar1_with_anisotropy 17 48562.57 153.5138587
+spatial_random_fields                            14 48716.08   3.0897963
+spatial_random_fields_with_anisotropy            16 48719.17  25.7967191
+spatiotemporal_random_fields_iid_with_anisotropy 16 48744.97   0.2340033
+spatiotemporal_random_fields_iid                 14 48745.20 271.1929018
+error_only                                       12 49016.39          NA
