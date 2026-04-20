@@ -44,8 +44,8 @@ py_config() # check path and version
 
 # Access the data using your credentials (Copernicus account)
 # Register at: https://data.marine.copernicus.eu/register?pk_vid=11ceae9d3160528d17743415560fb363
-setup_copernicus(username = "filippomariacassa@gmail.com",
-                 password = "v7w!vT_AS8W_S52",
+setup_copernicus(username = "YOUR_USER",
+                 password = "YOUR_PASSWORD",
                  store_credentials = TRUE)
 
 # Load original data for extent
