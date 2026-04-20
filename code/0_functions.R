@@ -1,291 +1,107 @@
-## File: 0_functions.R
-## Purpose: create useful functions to streamline analysis and code
+## Name: 0_functions.R
+## Purpose: create functions to streamline code
 ## Author: Filippomaria Cassarino
-## Date: 
+## Date: 16 Apr 2026
 
 ## Notes ----
 
-#
+# Grid plotting function is not finished yet
 
 ## Install and/or load packages function ----
-install_load_function <- function(pkg){
-new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
-if (length(new.pkg))
-  install.packages(new.pkg, dependencies = TRUE)
-sapply(pkg, require, character.only = TRUE)
+
+# Description: installs missing packages and loads required ones
+
+# Function
+install_load_packages <- function(pkg){
+  
+  # identify missing packages
+  new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+  
+  # install missing packages
+  if (length(new.pkg) > 0) {
+    
+    install.packages(new.pkg, dependencies = TRUE)
+  }
+    
+  # load required packages
+  sapply(pkg, require, character.only = TRUE)
 }
 
-save(install_load_function, file = "tools/install_load_function.RData")
+save(install_load_packages, file = "tools/install_load_packages_function.RData")
 
-## Functional diversity function ----
+## Variance inflation factor (VIF) function ----
 
-# Description
+# Description: computes the VIF of all the variables in a data frame,
+# returning those above 2. This is a strict threshold 
+# that avoids the hiding of weak ecological effects. 
+# See Zuur et al., 2010
+# https://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2009.00001.x
 
-# Required packages 
-library(BAT)
-
-# Function 
-Fdiversity <- function(species_matrix, trait_matrix) {
-  hv <<- BAT::kernel.build(comm = species_matrix,   
-                           trait = trait_matrix,
-                           method.hv = "gaussian", 
-                           abund = TRUE,    
-                           cores = 1) 
+# Function
+vif <- function(df) {
   
-  Fric <- kernel.alpha(hv)
-  Fdis <- kernel.dispersion(hv, func = "divergence", frac = 0.1)
-  Feve <- kernel.evenness(hv)                     
+  vif_values <- numeric(ncol(df))
   
-  functional_diversity <- data.frame(haul_id = names(Fric), Fric, Feve, Fdis)
-  save(functional_diversity, file = "data/intermediate/functional_diversity.RData")
+  names(vif_values) <- colnames(df)
+  
+  for (i in seq_along(df)) {
+    
+    y <- df[[i]]
+    x <- df[, -i, drop = FALSE]
+    r2 <- summary(lm(y ~ ., data = x))$r.squared
+    vif_values[i] <- 1 / (1 - r2)
+  }
+  
+  vif_vals <- vif_values[vif_values >= 2]
+  
+  if (length(vif_vals > 0)) {
+    
+    message("VIF values >= 2 detected:")
+    return(vif_vals)
+    
+  } else {
+    
+    message("All VIF values < 2")
+    
+    return(vif_values)}
 }
 
-save(Fdiversity, file = "tools/Fdiversity_function.RData")
+save(vif, file = "tools/vif_function.RData")
 
 ## Model selection functions ----
 
-# Description
+# Description: random_model_selection builds a mesh to reduce 
+# spatial complexity, fits glmms with different random structures,
+# selects best random structure based of AIC 
+# and opens a pdf detailing the selection process, model summary,
+# and model validation.
+
+# manual_model_selection does the same but allows to select random term
 
 # Required packages 
-library(sdmTMB)
-library(dplyr)
-  
-# Function for complete model selection (both fixed and random term)
-model_selection <- function(directory,
-                            name,
-                            data,
-                            mesh_cutoff,
-                            family,
-                            fixed_formula) {
-
-vars <- all.vars(fixed_formula)
-
-mesh <- make_mesh(data,
-                  xy_cols = c("longitude", "latitude"),
-                  cutoff = mesh_cutoff)
-
-# Random-term selection ----
-
-# 1) random error only
-error_only <- sdmTMB(
-  formula = fixed_formula, 
-  data = data, 
-  mesh = mesh,
-  spatial = "off",
-  family = family,
-  reml = TRUE) 
-
-# 2) 1 + spatial random fields 
-spatial_random_fields <- update(error_only , spatial = "on")
-
-# 3) 2 + anisotropy
-spatial_random_fields_with_anisotropy <- update(spatial_random_fields,
-                                                anisotropy = TRUE) 
-
-# 4) 2 + spatiotemporal random fields ("iid" = temporally independent)
-spatiotemporal_random_fields_iid <- update(spatial_random_fields,
-                                           time = "year", spatiotemporal = "iid") 
-
-# 5) 4 + anisotropy
-spatiotemporal_random_fields_iid_with_anisotropy <- update(spatiotemporal_random_fields_iid,
-                                                           anisotropy = TRUE) 
-
-# 6) 2 + spatiotemporal random fields ("ar1" = temporally dependent) # !!! check
-spatiotemporal_random_fields_ar1 <- update(spatial_random_fields, 
-                                           time = "year", spatiotemporal = "ar1")
-
-# 7) 6 + anisotropy
-spatiotemporal_random_fields_ar1_with_anisotropy <- update(spatiotemporal_random_fields_ar1,
-                                                           anisotropy = TRUE)
-
-# List models
-random_list <- list(
-  error_only = error_only,
-  spatial_random_fields = spatial_random_fields,
-  spatial_random_fields_with_anisotropy = spatial_random_fields_with_anisotropy,
-  spatiotemporal_random_fields_iid = spatiotemporal_random_fields_iid,
-  spatiotemporal_random_fields_iid_with_anisotropy = spatiotemporal_random_fields_iid_with_anisotropy,
-  spatiotemporal_random_fields_ar1 = spatiotemporal_random_fields_ar1,
-  spatiotemporal_random_fields_ar1_with_anisotropy = spatiotemporal_random_fields_ar1_with_anisotropy
+c(
+  "dplyr",
+  "sdmTMB",
+  "DHARMa"
 )
 
-# Check sanity
-random_sanity_check <- sapply(random_list, sanity)
-bad_random <- names(random_list)[!as.logical(random_sanity_check["all_ok", ])]
-
-
-# AIC
-random_aic <- AIC(error_only,
-                  spatial_random_fields ,
-                  spatial_random_fields_with_anisotropy,
-                  spatiotemporal_random_fields_iid,
-                  spatiotemporal_random_fields_iid_with_anisotropy,
-                  spatiotemporal_random_fields_ar1,
-                  spatiotemporal_random_fields_ar1_with_anisotropy)
-
-# Order
-random_aic <- random_aic[order(random_aic$AIC), ] 
-
-# Differences between each model and the next better one
-random_aic$delta_AIC <- c(diff(random_aic$AIC), NA)
-
-# Print for possible manual selection
-print(random_aic)
-
-# Select the best model which is at least > 2 units better than the following    
-if (random_aic$delta_AIC[1] > 2) {  
-  selected <- rownames(random_aic)[1]
-} else if (random_aic$delta_AIC[2] > 2) {
-  lowest_df <- min(random_aic[1:2, ]$df) # lowest degrees of freedom between the two
-  selected <- rownames(random_aic)[1:2][random_aic$df[1:2] == lowest_df][1] # choose the lowest (or the first if equal)
-} else {
-  stop("Manual random term selectio required; use 'random_aic' for comparisons") 
-} 
-
-# Fixed-term selection ----
-
-# Refit model with maximum likelihood (Zuur et al, 2009)
-fit_full <- update(get(selected), reml = FALSE) 
-
-# Remove each covariate to assess model changes
-covariates <- vars[-1]
-
-fixed_list <- list()
-for (var in covariates) {
-  to_remove <- as.formula(paste(". ~ . -", var))
-  formula_new <- update(formula(fit_full), to_remove)
-  fixed_list[[paste0("model_without_", var)]] <- sdmTMB( # update() doesn't work for this
-    formula = formula_new,
-    data = data,
-    mesh = mesh,
-    family = family,
-    spatial = fit_full$spatial,
-    spatiotemporal = fit_full$spatiotemporal,
-    anisotropy = if (is.null(fit_full$anisotropy)) FALSE else fit_full$anisotropy,
-    time = fit_full$time,
-    reml = FALSE
+# Selection function 
+model_selection <- function(directory,     # directory to save results
+                            name,          # model name
+                            data,          # data
+                            mesh_cutoff,   # minimum size for mesh in km
+                            family,        # distribution family
+                            fixed_formula) # fixed effects formula
+{
+  
+  # Build mesh
+  mesh <- sdmTMB::make_mesh(
+    data,
+    xy_cols = c("longitude", "latitude"),
+    cutoff = mesh_cutoff
   )
-}
-
-# Check sanity
-fixed_sanity_check <- sapply(fixed_list, sanity)
-bad_fixed <- names(fixed_list)[!as.logical(fixed_sanity_check["all_ok", ])]
-
-# Compute AIC of all models
-fixed_aic <- data.frame(
-  model = names(fixed_list),
-  AIC = sapply(fixed_list, AIC)
-) |>
-  mutate(
-    delta_AIC = AIC - AIC(fit_full),
-    var_removed = gsub("model_without_", "", model)
-  ) |>
-  arrange(desc(AIC))
-
-# Keep variables that reduce AIC by > 2
-vars_to_keep <- covariates[!covariates %in% fixed_aic$var_removed[fixed_aic$delta_AIC <= 2]]
-response <- vars[1]
-
-if (length(vars_to_keep) > 0) {
-  final_fixed_formula <- formula(paste(response, " ~ ", paste(vars_to_keep, collapse = " + ")))
-} else {
-  final_fixed_formula <- formula(paste0(response, " ~ 1"))
-}
-
-# Final model
-model <- sdmTMB( 
-  formula = final_fixed_formula,
-  data = data,
-  mesh = mesh,
-  family = family,
-  spatial = fit_full$spatial,
-  spatiotemporal = fit_full$spatiotemporal,
-  anisotropy = if (is.null(fit_full$anisotropy)) FALSE else fit_full$anisotropy,
-  time = fit_full$time,
-  reml = TRUE
-)
-
-# Objects to return or save ----
-
-# Start logging to file
-log_file <- file.path(directory, paste0(name, "_model_selection_checks.txt"))
-sink(log_file)
-
-cat(paste0("\nMODEL SELECTION CHECKS (", name, " model)\n"))
-cat("\n---------------------------------------------------------------------\n")
-cat("\nRANDOM TERM\n")
-
-# Report random-term sanity
-if (length(bad_random) > 0) {
-  cat("\nSanity check failed for the following random-term models:\n")
-  cat(paste(bad_random, collapse = ", "), "\n")
-} else {
-  cat("\nAll models in the random-term selection passed sanity checks.\n")
-}
-
-# Selected random structure
-cat("\nSelected random structure:", selected, "\n")
-cat("\n---------------------------------------------------------------------\n")
-cat("\nFIXED TERM\n")
-
-# Report fixed-term sanity
-if (length(bad_fixed) > 0) {
-  cat("\nSanity check failed for the following fixed-term models:\n")
-  cat(paste(bad_fixed, collapse = ", "), "\n")
-} else {
-  cat("\nAll models in the fixed-term selection passed sanity checks.\n")
-}
-
-# Selected fixed structure
-cat("\nSelected fixed structure:\n")
-cat(paste(deparse(final_fixed_formula), collapse = ""), "\n")
-cat("\n---------------------------------------------------------------------\n")
-cat("\nCOLLINEARITY AMONG COVARIATES\n")
-
-# Print AIC tables
-cat("\nRandom-term selection AIC table:\n")
-print(random_aic)
-
-cat("\nFixed-term selection AIC table:\n")
-print(fixed_aic)
-
-cat("\n---------------------------------------------------------------------\n")
-cat("\nMODEL\n")
-
-# Print model
-cat(paste0("\n", name,  " model\n"))
-print(model)
-cat("\n---------------------------------------------------------------------\n")
-
-# Stop logging
-sink()
-
-# Save its coefficients as excell
-write.table(data.frame(tidy(model),
-                      model = name,
-                      response = response,
-           paste0(directory, "/", name, "_model_coefficients.xlsx")))
-
-# Return final model
-return(model)
-
-}
-
-# Function for partial model selection (only random term)
-model_selection_only_random <- function(directory, 
-                                        name,
-                                        data,
-                                        mesh_cutoff,
-                                        family,
-                                        fixed_formula) {
   
-  vars <- all.vars(fixed_formula)
-  
-  mesh <- make_mesh(data,
-                    xy_cols = c("longitude", "latitude"),
-                    cutoff = mesh_cutoff)
-  
-  # Random-term selection ----
+  # Fit models with different random terms ----
   
   # 1) random error only
   error_only <- sdmTMB(
@@ -294,48 +110,76 @@ model_selection_only_random <- function(directory,
     mesh = mesh,
     spatial = "off",
     family = family,
-    reml = TRUE) 
+    reml = TRUE
+  ) 
   
   # 2) 1 + spatial random fields 
-  spatial_random_fields <- update(error_only , spatial = "on")
-  
-  # 3) 2 + anisotropy
-  spatial_random_fields_with_anisotropy <- update(spatial_random_fields,
-                                                  anisotropy = TRUE) 
-  
-  # 4) 2 + spatiotemporal random fields ("iid" = temporally independent)
-  spatiotemporal_random_fields_iid <- update(spatial_random_fields,
-                                             time = "year", spatiotemporal = "iid") 
-  
-  # 5) 4 + anisotropy
-  spatiotemporal_random_fields_iid_with_anisotropy <- update(spatiotemporal_random_fields_iid,
-                                                             anisotropy = TRUE) 
-  
-  # 6) 2 + spatiotemporal random fields ("ar1" = temporally dependent) 
-  spatiotemporal_random_fields_ar1 <- update(spatial_random_fields, 
-                                             time = "year", spatiotemporal = "ar1")
-  
-  # 7) 6 + anisotropy
-  spatiotemporal_random_fields_ar1_with_anisotropy <- update(spatiotemporal_random_fields_ar1,
-                                                             anisotropy = TRUE)
-  
-  # List models
-  random_list <- list(
-    error_only = error_only,
-    spatial_random_fields = spatial_random_fields,
-    spatial_random_fields_with_anisotropy = spatial_random_fields_with_anisotropy,
-    spatiotemporal_random_fields_iid = spatiotemporal_random_fields_iid,
-    spatiotemporal_random_fields_iid_with_anisotropy = spatiotemporal_random_fields_iid_with_anisotropy,
-    spatiotemporal_random_fields_ar1 = spatiotemporal_random_fields_ar1,
-    spatiotemporal_random_fields_ar1_with_anisotropy = spatiotemporal_random_fields_ar1_with_anisotropy
+  spatial_random_fields <- update(
+    error_only,
+    spatial = "on"
   )
   
-  # Check sanity
+  # 3) 2 + anisotropy
+  spatial_random_fields_with_anisotropy <- update(
+    spatial_random_fields,
+    anisotropy = TRUE
+  ) 
+  
+  # 4) 2 + spatiotemporal random fields ("iid" = temporally independent)
+  spatiotemporal_random_fields_iid <- update(
+    spatial_random_fields,
+    time = "year", 
+    spatial = "off",
+    spatiotemporal = "iid"
+  ) 
+  
+  # 5) 4 + anisotropy
+  spatiotemporal_random_fields_iid_with_anisotropy <- update(
+    spatiotemporal_random_fields_iid,
+    anisotropy = TRUE
+  ) 
+  
+  # 6) 2 + spatiotemporal random fields ("ar1" = temporally dependent) 
+  spatiotemporal_random_fields_ar1 <- update(
+    spatial_random_fields, 
+    spatial = "off",
+    time = "year",
+    spatiotemporal = "ar1"
+  )
+  
+  # 7) 6 + anisotropy
+  spatiotemporal_random_fields_ar1_with_anisotropy <- update(
+    spatiotemporal_random_fields_ar1,
+    anisotropy = TRUE
+  )
+  
+  # list models
+  random_list <- list(
+    error_only = 
+      error_only,
+    spatial_random_fields = 
+      spatial_random_fields,
+    spatial_random_fields_with_anisotropy = 
+      spatial_random_fields_with_anisotropy,
+    spatiotemporal_random_fields_iid = 
+      spatiotemporal_random_fields_iid,
+    spatiotemporal_random_fields_iid_with_anisotropy = 
+      spatiotemporal_random_fields_iid_with_anisotropy,
+    spatiotemporal_random_fields_ar1 = 
+      spatiotemporal_random_fields_ar1,
+    spatiotemporal_random_fields_ar1_with_anisotropy = 
+      spatiotemporal_random_fields_ar1_with_anisotropy
+  )
+  
+  # check sanity
   random_sanity_check <- sapply(random_list, sanity)
+  
+  # identify potential bad models
   bad_random <- names(random_list)[!as.logical(random_sanity_check["all_ok", ])]
   
+  # Calculate AIC and ΔAIC ----
   
-  # AIC
+  # calculate AIC
   random_aic <- AIC(error_only,
                     spatial_random_fields,
                     spatial_random_fields_with_anisotropy,
@@ -344,94 +188,210 @@ model_selection_only_random <- function(directory,
                     spatiotemporal_random_fields_ar1,
                     spatiotemporal_random_fields_ar1_with_anisotropy)
   
-  # Order
+  # order 
   random_aic <- random_aic[order(random_aic$AIC), ] 
   
-  # Differences between each model and the next better one
+  # compute ΔAIC between each model and the next better one
   random_aic$delta_AIC <- c(diff(random_aic$AIC), NA)
   
-  # Print for possible manual selection
+  # print for potential manual selection
   print(random_aic)
   
-  # Select the best model which is at least > 2 units better than the following    
-  if (random_aic$delta_AIC[1] > 2) {  
+  # Select ----
+  
+  #   if the 1st and 2nd models have ΔAIC ≥ 2, select 1st  
+  if (random_aic$delta_AIC[1] >= 2) { 
+    
     selected <- rownames(random_aic)[1]
+    
+    # if the 1st and 2nd have ΔAIC < 2 and 2nd and 3rd have ΔAIC ≥ 2,
+    # select among the first 2 the one with the fewest degrees of freedom 
+    # or 1st if they have the same degrees of freedom 
   } else if (random_aic$delta_AIC[2] > 2) {
-    lowest_df <- min(random_aic[1:2, ]$df) # lowest degrees of freedom between the two
-    selected <- rownames(random_aic)[1:2][random_aic$df[1:2] == lowest_df][1] # choose the lowest (or the first if equal)
+    
+    lowest_df <- min(random_aic[1:2, ]$df) 
+    
+    selected <- rownames(random_aic)[1:2][random_aic$df[1:2] == lowest_df][1] 
+    
+    # if the 2nd and 3rd have ΔAIC < 2, manual selection is required
   } else {
-    stop("Manual random term selectio required; use 'random_aic' for comparisons") 
+    
+    stop(
+      "Manual random term selectio required: use 'random_aic' for comparisons,
+    then 'manual_random_model_selection' to fit the model, specifying the 
+    structure through the argument 'random_selection' and the structure names
+    from 'random_aic'."
+    ) 
   } 
   
-  # Final_model
+  # selected model
   model <- get(selected)
   
-  # Objects to return or save ----
+  # Report general information ----
   
-  # Start logging to file
-  log_file <- file.path(directory, paste0(name, "_model_selection_checks.txt"))
-  sink(log_file)
+  # model data
+  data <- model.frame(model)
   
-  cat(paste0("\nMODEL SELECTION CHECKS (", name, " model)\n"))
-  cat("\n---------------------------------------------------------------------\n")
-  cat("\nRANDOM TERM\n")
+  # some calculations have a random component
+  set.seed(8)
   
-  # Report random-term sanity
-  if (length(bad_random) > 0) {
-    cat("\nWARNING: model selection should not be trusted\n")
+  # residual simulation for validation
+  simulation <- simulate(
+    model, 
+    nsim = 500, 
+    type = "mle-mvn"
+  ) 
+  
+  residuals <- sdmTMB::dharma_residuals(
+    simulation,
+    model,
+    return_DHARMa = TRUE
+  )
+  
+  # open pdf
+  pdf(file = paste0(
+    directory,
+    "/", 
+    name, 
+    "_model_selection.pdf"),
+    width = 8.5, height = 11)  # standard page size
+  
+  # model information
+  text_output <- capture.output({
     
-    cat("\nSanity check failed for the following random structures:\n")
-    cat(paste(bad_random, collapse = ", "), "\n")
-  } else {
-    cat("\nAll models in the random-term selection passed sanity checks.\n")
+    cat("-------------------------------------------------------------------\n")
+    cat("MODEL SELECTION AND VALIDATION REPORT (", name, "model )\n")
+    cat("-------------------------------------------------------------------\n\n")
+    
+    cat(paste0("## OBSERVATIONS:", nrow(data), "\n\n"))
+    
+    if (length(bad_random) > 0) {
+      cat("## SANITY: warning - sanity check failed for the following models:\n")
+      cat(paste(bad_random, collapse = ",\n "), "\n")
+    } else {
+      cat("## SANITY: OK - all models in the selection process passed sanity checks.\n")
+    }
+    
+    cat("\n## SELECTED RANDOM TERM:", selected, "\n\n")
+    
+    cat("## MODEL SUMMARY (", name, "model )\n\n")
+    print(model)
+    
+    cat("\n## SELECTION STATISTICS\n")
+    print(random_aic)
+    
+  })
+  
+  par(mar = c(1, 1, 1, 1), oma = c(2, 2, 2, 2))
+  
+  plot.new()
+  text(
+    x = 0, y = 1,
+    labels = paste(text_output, collapse = "\n"),
+    adj = c(0, 1),
+    family = "mono",
+    cex = 0.8
+  )
+  
+  # Validation ----
+  # diagnostics plots
+  par(mfrow = c(2, 2), mar = c(4, 4, 3, 1), oma = c(2, 2, 2, 2))
+  
+  DHARMa::testDispersion(residuals)
+  DHARMa::testOutliers(residuals)
+  DHARMa::plotQQunif(residuals)
+  DHARMa::plotResiduals(residuals)
+  
+  # spatial autocorrelation
+  par(mfrow = c(1, 1), mar = c(4, 4, 3, 1), oma = c(2, 2, 2, 2))
+  
+  spatial_test <- DHARMa::testSpatialAutocorrelation(
+    residuals,    
+    x = data$longitude,
+    y = data$latitude,
+    plot = TRUE
+  )
+  
+  pval <- round(spatial_test$p.value, 3)
+  obs  <- round(spatial_test$statistic[1], 3)
+  
+  mtext(
+    paste0(
+      "Moran's I = ", obs,
+      " | H1: Distance-based autocorrelation",
+      " | p-value = ", pval
+    ),
+    side = 3, line = 0, cex = 0.8
+  )
+  
+  # residuals vs predictors
+  predictors <- setdiff(
+    colnames(data),
+    c(
+      all.vars(formula(model))[1],
+      "year",
+      "depth",
+      "longitude",
+      "latitude",
+      "haul_id",
+      "_sdmTMB_time"
+    )
+  )
+  
+  plots_per_page <- 16
+  n_pages <- ceiling(length(predictors) / plots_per_page)
+  
+  for (p in seq_len(n_pages)) {
+    idx <- ((p - 1) * plots_per_page + 1):
+      min(p * plots_per_page, length(predictors))
+    
+    par(mfrow = c(4, 4), mar = c(4, 4, 4, 1), oma = c(2, 2, 2, 2))
+    
+    for (i in idx) {
+      predictor <- data[[predictors[i]]]
+      DHARMa::plotResiduals(residuals, form = predictor)
+      mtext(paste0("Predictor: ", predictors[i]),
+            side = 3, line = 0.5, cex = 0.7)
+    }
   }
   
-  # Selected random structure
-  cat("\nSelected random structure:", selected, "\n")
-  cat("\n---------------------------------------------------------------------\n")
-  cat("\nFIXED TERM\n")
+  par(mfrow = c(1, 1))
   
-  # Print AIC tables
-  cat("\nRandom-term selection AIC table:\n")
-  print(random_aic)
+  # Objects to return ----
   
-  cat("\n---------------------------------------------------------------------\n")
-  cat("\nMODEL\n")
+  # close PDF
+  dev.off()
   
-  # Print model
-  cat(paste0("\n", name,  " model\n"))
-  print(model)
-  cat("\n---------------------------------------------------------------------\n")
+  # save coefficients
+  write.table(
+    data.frame(tidy(model), model = name),
+    file = paste0(directory, "/", name, "_model_coefficients.csv"),
+    sep = ","
+  )
   
-  # Stop logging
-  sink()
-  
-  # Save its coefficients as excell
-  write.table(data.frame(tidy(model),
-                         model = name),
-                        file = paste0(directory, "/", name, "_model_coefficients.csv"))
- 
-  # Return final model
+  # return selected model
   return(model)
+  
 }
 
-# Function for manual model selection
+# Manual selection function
 manual_model_selection <- function(directory, 
                                    name,
                                    data,
                                    mesh_cutoff,
                                    family,
-                                   random_selection,
-                                   fixed_formula) {
+                                   random_selection, # select random structure
+                                   fixed_formula) 
+{
   
-  vars <- all.vars(fixed_formula)
-  
-  mesh <- make_mesh(data,
-                    xy_cols = c("longitude", "latitude"),
-                    cutoff = mesh_cutoff)
+  mesh <- make_mesh(
+    data,
+    xy_cols = c("longitude", "latitude"),
+    cutoff = mesh_cutoff
+  )
   
   # Random-term selection ----
-
+  
   if (random_selection == "error_only") {
     
     # 1) random error only
@@ -443,7 +403,7 @@ manual_model_selection <- function(directory,
       family = family,
       reml = TRUE)
   }
-   
+  
   if (random_selection == "spatial_random_fields") {
     
     # 2) 1 + spatial random fields 
@@ -476,7 +436,7 @@ manual_model_selection <- function(directory,
       formula = fixed_formula, 
       data = data, 
       mesh = mesh,
-      spatial = "on",
+      spatial = "off",
       family = family,
       anisotropy = TRUE,
       time = "year",
@@ -491,7 +451,7 @@ manual_model_selection <- function(directory,
       formula = fixed_formula, 
       data = data, 
       mesh = mesh,
-      spatial = "on",
+      spatial = "off",
       family = family,
       time = "year",
       spatiotemporal = "iid",
@@ -506,7 +466,7 @@ manual_model_selection <- function(directory,
       formula = fixed_formula, 
       data = data, 
       mesh = mesh,
-      spatial = "on",
+      spatial = "off",
       family = family,
       anisotropy = TRUE,
       time = "year",
@@ -521,7 +481,7 @@ manual_model_selection <- function(directory,
       formula = fixed_formula, 
       data = data, 
       mesh = mesh,
-      spatial = "on",
+      spatial = "off",
       family = family,
       anisotropy = TRUE,
       time = "year",
@@ -530,101 +490,82 @@ manual_model_selection <- function(directory,
       reml = TRUE)
   } 
   
-  
-  # Check sanity
+  # check sanity
   random_sanity <- sanity(model)
   
-  # Objects to return or save ----
+  if (random_sanity["all_ok"] == FALSE) {
+    stop("Sanity check failed for model.", call. = FALSE)
+  }
   
-  # Start logging to file
-  log_file <- file.path(directory, paste0(name, "_model_selection_checks.txt"))
-  sink(log_file)
+  # Report general information ----
   
-  cat(paste0("\nMODEL SELECTION CHECKS (", name, " model)\n"))
-  cat("\n---------------------------------------------------------------------\n")
+  # model data
+  data <- model.frame(model)
   
-  # Selected random structure
-  cat("\nManually selected random structure:", random_selection, "\n")
-  cat("\n---------------------------------------------------------------------\n")
-  
-  # Model sanity
-  cat("\nModel passed sanity check:", random_sanity$all_ok, "\n")
-  
-  cat("\n---------------------------------------------------------------------\n")
-  cat("\nMODEL\n")
-  
-  # Print model
-  cat(paste0("\n", name,  " model\n"))
-  print(model)
-  cat("\n---------------------------------------------------------------------\n")
-  
-  # Stop logging
-  sink()
-  
-  # Save its coefficients as excell
-  write.table(data.frame(tidy(model),
-                         model = name),
-              file = paste0(directory, "/", name, "_model_coefficients.csv"))
-  
-  # Return final model
-  return(model)
-}
-
-# Save
-save(model_selection,
-     model_selection_only_random,
-     manual_model_selection,
-     file = "tools/model_selection_function.RData")
-
-## Model validation function ----
-
-# Description
-
-# Required packages
-library(DHARMa)
-library(dplyr)
-
-# Function
-model_validation <- function(model, data, name, directory) {
+  # some calculations have a random component
   set.seed(8)
   
-  ## Residual simulation
-  simulation <- simulate(model, nsim = 500, type = "mle-mvn") 
-  residuals <- dharma_residuals(simulation, model, return_DHARMa = TRUE)
+  # residual simulation for validation
+  simulation <- simulate(
+    model, 
+    nsim = 500, 
+    type = "mle-mvn"
+  ) 
   
-  ## Open pdf
-  pdf(file = paste0(directory, "/", name, "_model_validation.pdf"),
-      width = 8.5, height = 11)  # standard page size
-  
-  ## Basic information ----
-  plot.new()
-  
-  text(
-    x = 0, y = 1,
-    labels = paste( 
-      "Model validation report",
-      "",
-      paste("Model:", name),
-      paste("Observations:", nrow(data)),
-      paste("Date:", Sys.Date()),
-      sep = "\n"
-    ),
-    adj = c(0, 1),
-    cex = 1
+  residuals <- sdmTMB::dharma_residuals(
+    simulation,
+    model,
+    return_DHARMa = TRUE
   )
   
+  # open pdf
+  pdf(file = paste0(
+    directory,
+    "/", 
+    name, 
+    "_model_selection.pdf"),
+    width = 8.5, height = 11)  # standard page size
   
-  ## Main diagnostics ----
-  par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
+  # model information
+  text_output <- capture.output({
+    
+    cat("-------------------------------------------------------------------\n")
+    cat("MODEL SELECTION AND VALIDATION REPORT (", name, "model )\n")
+    cat("-------------------------------------------------------------------\n\n")
+    
+    cat(paste0("## OBSERVATIONS:", nrow(data), "\n\n"))
+    
+    cat("## SANITY: OK - the model passed sanity check.\n\n")
+    
+    cat("## MANUALLY SELECTED RANDOM TERM:", random_selection, "\n\n")
+    
+    cat("## MODEL SUMMARY (", name, "model )\n\n")
+    print(model)
+    
+  })
+  
+  par(mar = c(1, 1, 1, 1), oma = c(2, 2, 2, 2))
+  
+  plot.new()
+  text(
+    x = 0, y = 1,
+    labels = paste(text_output, collapse = "\n"),
+    adj = c(0, 1),
+    family = "mono",
+    cex = 0.8
+  )
+  
+  # Validation ----
+  # diagnostics plots
+  par(mfrow = c(2, 2), mar = c(4, 4, 3, 1), oma = c(2, 2, 2, 2))
   
   DHARMa::testDispersion(residuals)
   DHARMa::testOutliers(residuals)
   DHARMa::plotQQunif(residuals)
   DHARMa::plotResiduals(residuals)
   
-  
-  ## Spatial autocorrelation ----
-  par(mfrow = c(1, 1), mar = c(4, 4, 3, 1))
+  # spatial autocorrelation
+  par(mfrow = c(1, 1), mar = c(4, 4, 3, 1), oma = c(2, 2, 2, 2))
   
   spatial_test <- DHARMa::testSpatialAutocorrelation(
     residuals,    
@@ -645,12 +586,17 @@ model_validation <- function(model, data, name, directory) {
     side = 3, line = 0, cex = 0.8
   )
   
-  ## Residuals vs predictors ----
+  # residuals vs predictors
   predictors <- setdiff(
     colnames(data),
     c(
       all.vars(formula(model))[1],
-      "year", "depth", "longitude", "latitude", "haul_id"
+      "year",
+      "depth",
+      "longitude",
+      "latitude",
+      "haul_id",
+      "_sdmTMB_time"
     )
   )
   
@@ -661,7 +607,7 @@ model_validation <- function(model, data, name, directory) {
     idx <- ((p - 1) * plots_per_page + 1):
       min(p * plots_per_page, length(predictors))
     
-    par(mfrow = c(4, 4), mar = c(4, 4, 4, 1))
+    par(mfrow = c(4, 4), mar = c(4, 4, 4, 1), oma = c(2, 2, 2, 2))
     
     for (i in idx) {
       predictor <- data[[predictors[i]]]
@@ -673,42 +619,58 @@ model_validation <- function(model, data, name, directory) {
   
   par(mfrow = c(1, 1))
   
-  ## Close PDF
+  # Objects to return ----
+  
+  # close PDF
   dev.off()
+  
+  # save coefficients
+  write.table(
+    data.frame(tidy(model), model = name),
+    file = paste0(directory, "/", name, "_model_coefficients.csv"),
+    sep = ","
+  )
+  
+  # return selected model
+  return(model)
 }
 
-# Save
-save(model_validation, file = "tools/model_validation_function.RData")
 
+# Save
+save(model_selection,
+     manual_model_selection,
+     file = "tools/model_selection_functions.RData")
 
 ## Model prediction function ----
 
-# Description
+# Description: plots model predictions for each variable in the model
 
 # Required packages
-library(sdmTMB)
-library(dplyr)
-library(ggplot2)
+c(
+  "dplyr",
+  "ggplot2",
+  "sdmTMB"
+  )
 
 # Function
-model_prediction <- function(model, name, directory) {
+model_prediction <- function(model, name, directory, vars) {
   
-  # Model variables
+  # model variables
   fixed_vars <- all.vars(formula(model))[-1]
   response <- all.vars(formula(model))[1]
   
-  # Model data
+  # model data
   data <- model.frame(model)
   
-  # Log transform if the response is biomass
+  # log transform if the response is biomass
   if (family(model)$link == "log") {
     data[[response]] <- log(data[[response]])
   }
   
-  # Loop through each variable in the fixed formula
-  for (var in fixed_vars) {
+  # loop through each variable in the fixed formula
+  for (var in vars) {
     
-    # Create new data: vary current var, others fixed at their mean
+    # create new data: vary current var, others fixed at their mean
     nd <- data.frame(matrix(ncol = length(fixed_vars), nrow = 100))
     colnames(nd) <- fixed_vars
     
@@ -721,59 +683,64 @@ model_prediction <- function(model, name, directory) {
       }
     }
     
-    # Add year column (required)
+    # add year column (required)
     nd$year <- 2014
     
-    # Predict
-    pred <- predict(model, newdata = nd, se_fit = TRUE, re_form = NA)
+    # predict
+    pred <- predict(
+      model,
+      newdata = nd,
+      se_fit = TRUE,
+      re_form = NA
+      )
     
-    # Create ggplot
+    # compute confidence intervals
+    pred$lwr <- pred$est - 1.96 * pred$est_se
+    pred$upr <- pred$est + 1.96 * pred$est_se
+    
+    # create ggplot
     p <- ggplot() +
-      geom_point(data = data, aes_string(x = var, y =  response), color = "gray", size = 0.5) +
-      geom_line(data = pred, aes_string(x = var, y = "est"), color = "darkred", linewidth = 0.5) +
-      geom_ribbon(data = pred,
-                  aes_string(x = var,
-                             ymin = "est - 1.96 * est_se",
-                             ymax = "est + 1.96 * est_se"),
-                  alpha = 0.4, fill = "darkred") +
-      labs(title = paste(var, "effect on",  response),
+      geom_point(
+        data = data,
+        aes(x = .data[[var]], y = .data[[response]]),
+        pch = 19,
+        fill = "gray40",
+        alpha = 0.1
+        ) +
+      geom_line(
+        data = pred, 
+        aes(x = .data[[var]], y = est),
+        color = "darkred",
+        linewidth = 0.5
+        ) +
+      geom_ribbon(
+        data = pred,
+        aes(x = .data[[var]], 
+            ymin = lwr, 
+            ymax = upr),
+        alpha = 0.4,
+        fill = "darkred"
+      ) + 
+      labs(title = paste(var, "effect on",  response, " ± 95% CI"),
            x = var, y = response) +
       theme_bw() +
       theme(axis.title = element_text(size = 14))
     
-    # Save plot
-    ggsave(paste0(directory, "/", name, "_prediction_", var, ".png"),
-           plot = p, width = 8, height = 8, units = "cm")
-    
-    # Model coefficients 
-    coefs <- tidy(model, conf.int = TRUE)[-1, ]
-    
-    # Add color column
-    coefs$color <- ifelse(coefs$estimate >= 0, "Positive", "Negative")
-    
-    # Order terms for clean plotting
-    coefs$term <- factor(coefs$term, levels = coefs$term[order(coefs$estimate)])
-    
-    # Plot coefficients
-    p <- ggplot(coefs, aes(x = estimate, y = term, fill = color)) +
-      geom_col(width = 0.6) +  # bar from 0 to estimate
-      geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), height = 0.2) +
-      scale_fill_manual(values = c("Positive" = "forestgreen", "Negative" = "firebrick")) +
-      geom_vline(xintercept = 0, linetype = "dashed") +
-      labs(x = "Estimate (± 95% CI)", y = "Covariate", title = "Model Coefficients") +
-      theme_bw() +
-      theme(legend.position = "none")
-    
-    # Save plot
-    ggsave(paste0(directory, "/", name, "_coefficients_plot.png"),
-           plot = p, width = 8, height = 8, units = "cm")
+    # save plot
+    ggsave(paste0(
+      directory,
+      "/", name,
+      "_prediction_",
+      var,
+      ".png"),
+      plot = p, width = 9, height = 9, units = "cm")
   }
 }
 
 # Save
 save(model_prediction, file = "tools/model_prediction_function.RData")
 
-## Grid plotting function ----
+## Grid plotting function (TO BE FIXED) ----
 
 # Description
 
@@ -868,34 +835,6 @@ grid_plot <- function(data, variable, unit) {
 
 save(grid_plot, file = "tools/grid_plot_function.RData")
 
+rm(list = ls())
 
-
-## VIF function ----
-
-## Description
-# The function computes the variance inflation factor of all the variables 
-# in a data frame, returning those above 2. This is a strict threshold 
-# that avoids the hiding of weak ecological effects. 
-# See Zuur et al., 2010
-# https://onlinelibrary.wiley.com/doi/10.1111/j.2041-210X.2009.00001.x
-
-## Function
-vif <- function(df) {
-  vif_values <- numeric(ncol(df))
-  names(vif_values) <- colnames(df)
-  
-  for (i in seq_along(df)) {
-    y <- df[[i]]
-    x <- df[, -i, drop = FALSE]
-    r2 <- summary(lm(y ~ ., data = x))$r.squared
-    vif_values[i] <- 1 / (1 - r2)
-  }
-  vif_vals <- vif_values[vif_values >= 2]
-  if (length(vif_vals > 0)) {
-    message("VIF values >= 2 detected:")
-    return(vif_vals)
-    } else {message("All VIF values < 2")}
-
-}
-
-save(vif, file = "tools/vif_function.RData")
+## End
