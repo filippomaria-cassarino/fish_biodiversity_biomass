@@ -8,7 +8,6 @@
 
 ## Library ---- 
 load("tools/install_load_packages_function.RData")
-load("tools/model_selection_functions.RData")
 
 # Install/load required packages
 install_load_packages(
@@ -71,11 +70,19 @@ community_filtered <- nor_full %>%
 length(unique(community_filtered$haul_id)) # 3452 hauls
 length(unique(community_filtered$taxon))   # 106 species
 
+## Save filtered community data ----
+save(community_filtered, file = "data/intermediate/community_filtered.RData")
+
+rm(list = setdiff(ls(), "community_filtered")) # cleaning
+
 ## Check the effect of haul duration on species richness ----
 
 # Haul duration may affect the number of species encountered, so here
 # tric is models as response to haul duration, including spatiotemporal
 # random fields for possible autocorrelations
+
+# Load model selection function
+load("tools/model_selection_functions.RData")
 
 # Extract midpoint of the spatial distribution
 y_center <- round(mean(range(community_filtered$latitude, na.rm = TRUE)))
@@ -120,15 +127,6 @@ duration_model <- model_selection(
 w <- ((tidy(duration_model)[2, 2] / tidy(duration_model)[2, 3])[1, 1])^2
 1 - pchisq(w, df = 1) # retain H0
 
-# Validate
-load("tools/model_validation_function.RData")
-
-model_validation(
-  model = duration_model,
-  name = "duration",
-  directory = "models/haul_duration"
-)
-
 # Predict
 load("tools/model_prediction_function.RData")
 
@@ -141,9 +139,6 @@ model_prediction(
 
 # Model validation shows that assumptions are largely met. 
 # haul_dur has a minimal effect
-
-## Save filtered community data ----
-save(community_filtered, file = "data/intermediate/community_filtered.RData")
 
 rm(list = setdiff(ls(), "community_filtered")) # cleaning
 
