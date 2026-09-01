@@ -489,9 +489,9 @@ biomass_coeff <- biomass_coeff %>%
       grepl("feve", term) ~ "feve",
       TRUE ~ term),
     # Add significance column
-    significance = case_when(
-      conf.low * conf.high > 0 ~ "Significant",
-      conf.low * conf.high <= 0 ~ "Not significant"
+    support = case_when(
+      conf.low * conf.high > 0 ~ "Supported",
+      conf.low * conf.high <= 0 ~ "Not supported"
     )) %>%
   select(-X)
 
@@ -949,9 +949,9 @@ levels(diversity_coeff$term) <- c(
 
 diversity_coeff <- diversity_coeff %>%
 mutate(
-  significance = case_when(
-    conf.low * conf.high > 0 ~ "Significant",
-    conf.low * conf.high <= 0 ~ "Not significant"
+  support = case_when(
+    conf.low * conf.high > 0 ~ "Supported",
+    conf.low * conf.high <= 0 ~ "Not supported"
   )) %>%
   select(-X)
 
