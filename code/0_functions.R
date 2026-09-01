@@ -1,11 +1,9 @@
 ## Name: 0_functions.R
 ## Purpose: create functions to streamline code
 ## Author: Filippomaria Cassarino
-## Date: 16 Apr 2026
+## Date: 14 Aug 2026
 
 ## Notes ----
-
-# Grid plotting function is not finished yet
 
 ## Install and/or load packages function ----
 
@@ -129,7 +127,7 @@ model_selection <- function(directory,     # directory to save results
   spatiotemporal_random_fields_iid <- update(
     spatial_random_fields,
     time = "year", 
-    spatial = "off",
+    spatial = "off", 
     spatiotemporal = "iid"
   ) 
   
@@ -199,12 +197,12 @@ model_selection <- function(directory,     # directory to save results
   
   # Select ----
   
-  #   if the 1st and 2nd models have ΔAIC ≥ 2, select 1st  
-  if (random_aic$delta_AIC[1] >= 2) { 
+  #   if the 1st and 2nd models have ΔAIC > 6, select 1st  
+  if (random_aic$delta_AIC[1] > 2) { 
     
     selected <- rownames(random_aic)[1]
     
-    # if the 1st and 2nd have ΔAIC < 2 and 2nd and 3rd have ΔAIC ≥ 2,
+    # if the 1st and 2nd have ΔAIC <= 2 and 2nd and 3rd have ΔAIC > 2,
     # select among the first 2 the one with the fewest degrees of freedom 
     # or 1st if they have the same degrees of freedom 
   } else if (random_aic$delta_AIC[2] > 2) {
@@ -213,7 +211,7 @@ model_selection <- function(directory,     # directory to save results
     
     selected <- rownames(random_aic)[1:2][random_aic$df[1:2] == lowest_df][1] 
     
-    # if the 2nd and 3rd have ΔAIC < 2, manual selection is required
+    # if the 2nd and 3rd have ΔAIC <= 2, manual selection is required
   } else {
     
     stop(
@@ -325,18 +323,21 @@ model_selection <- function(directory,     # directory to save results
   )
   
   # residuals vs predictors
-  predictors <- setdiff(
-    colnames(data),
-    c(
-      all.vars(formula(model))[1],
-      "year",
-      "depth",
-      "longitude",
-      "latitude",
-      "haul_id",
-      "_sdmTMB_time"
-    )
-  )
+  predictors <- unique(c(
+    setdiff(
+      colnames(data),
+      c(
+        all.vars(formula(model)),
+        "year",
+        "depth",
+        "longitude",
+        "latitude",
+        "haul_id",
+        "_sdmTMB_time",
+        grep("remove", colnames(data), value = TRUE)
+      ) ),
+    all.vars(formula(model))[-1]
+  ))
   
   plots_per_page <- 16
   n_pages <- ceiling(length(predictors) / plots_per_page)
@@ -413,6 +414,7 @@ manual_model_selection <- function(directory,
       mesh = mesh,
       spatial = "on",
       family = family,
+      anisotropy = FALSE,
       reml = TRUE)
   }
   
@@ -438,7 +440,7 @@ manual_model_selection <- function(directory,
       mesh = mesh,
       spatial = "off",
       family = family,
-      anisotropy = TRUE,
+      anisotropy = FALSE,
       time = "year",
       spatiotemporal = "iid",
       reml = TRUE)
@@ -468,7 +470,7 @@ manual_model_selection <- function(directory,
       mesh = mesh,
       spatial = "off",
       family = family,
-      anisotropy = TRUE,
+      anisotropy = FALSE,
       time = "year",
       spatiotemporal = "ar1",
       reml = TRUE)
@@ -483,7 +485,6 @@ manual_model_selection <- function(directory,
       mesh = mesh,
       spatial = "off",
       family = family,
-      anisotropy = TRUE,
       time = "year",
       spatiotemporal = "ar1",
       anisotropy = TRUE,
@@ -587,18 +588,21 @@ manual_model_selection <- function(directory,
   )
   
   # residuals vs predictors
-  predictors <- setdiff(
-    colnames(data),
-    c(
-      all.vars(formula(model))[1],
-      "year",
-      "depth",
-      "longitude",
-      "latitude",
-      "haul_id",
-      "_sdmTMB_time"
-    )
-  )
+  predictors <- unique(c(
+    setdiff(
+      colnames(data),
+      c(
+        all.vars(formula(model)),
+        "year",
+        "depth",
+        "longitude",
+        "latitude",
+        "haul_id",
+        "_sdmTMB_time",
+        grep("remove", colnames(data), value = TRUE)
+      ) ),
+    all.vars(formula(model))[-1]
+  ))
   
   plots_per_page <- 16
   n_pages <- ceiling(length(predictors) / plots_per_page)
@@ -653,7 +657,13 @@ c(
   )
 
 # Function
-model_prediction <- function(model, name, directory, vars) {
+model_prediction <- function(model, 
+                             name,
+                             directory, 
+                             vars, 
+                             covariate_names,
+                             response_name) 
+  {
   
   # model variables
   fixed_vars <- all.vars(formula(model))[-1]
@@ -704,14 +714,16 @@ model_prediction <- function(model, name, directory, vars) {
         data = data,
         aes(x = .data[[var]], y = .data[[response]]),
         pch = 19,
+        size = .75,
         fill = "gray40",
+        color = "gray20",
         alpha = 0.1
         ) +
       geom_line(
         data = pred, 
         aes(x = .data[[var]], y = est),
         color = "darkred",
-        linewidth = 0.5
+        linewidth = 0.75
         ) +
       geom_ribbon(
         data = pred,
@@ -721,10 +733,19 @@ model_prediction <- function(model, name, directory, vars) {
         alpha = 0.4,
         fill = "darkred"
       ) + 
-      labs(title = paste(var, "effect on",  response, " ± 95% CI"),
+      labs(title = paste(var, "effect on",  response, " ± CI"),
            x = var, y = response) +
-      theme_bw() +
-      theme(axis.title = element_text(size = 14))
+      theme(    
+        axis.title = element_text(size = 10),
+        axis.text = element_text(size = 8),
+        title = element_text(size = 10),
+        panel.background = element_rect(fill = "white", color = NA),
+        panel.border = element_rect(color = "gray70", 
+                                    fill = NA, 
+                                    linewidth = 0.3),
+        panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank()
+      ) 
     
     # save plot
     ggsave(paste0(
@@ -733,7 +754,7 @@ model_prediction <- function(model, name, directory, vars) {
       "_prediction_",
       var,
       ".png"),
-      plot = p, width = 9, height = 9, units = "cm")
+      plot = p, width = 5, height = 5.5, units = "cm")
   }
 }
 

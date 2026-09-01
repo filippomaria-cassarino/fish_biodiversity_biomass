@@ -239,7 +239,7 @@ ggsave(p, file = paste0("figures/maps/boreal_vs_arctic_area.jpg"),
        width = 12, height = 12, units = "cm")
 
 ## ------------------------------------------------------------------------ ----
-## Biomass composition ----
+## Figure 2 - Biomass composition ----
 
 # Load community data and top species
 load("data/intermediate/community_filtered.RData")
@@ -316,7 +316,7 @@ p <- ggplot(plot_data, aes(x = year, y = biomass, fill = species)) +
   )
 
 # Save plot
-ggsave(p, file = "figures/figure_2.jpg",
+ggsave(p, file = "figures/main_figures/figure_2.jpg",
        unit = "cm", height = 6.5, width = 8.5, 
        dpi = 1200)
 
@@ -366,7 +366,8 @@ for (ax in axes) {
   
   # save
   ggsave(p,
-         file = paste0("figures/functional_space_", ax[1], "_", ax[2], ".jpg"),
+         file = paste0("figures/supplementary_figures/functional_space_",
+                       ax[1], "_", ax[2], ".jpg"),
          width = 5, height = 5, units = "cm")
 }
 
@@ -428,7 +429,7 @@ p <- ggcorrplot(
       "darkred"
     ))
 
-ggsave(p, file = "figures/correlation_plot.jpg",
+ggsave(p, file = "figures/supplementary_figures/correlation_plot.jpg",
        unit = "cm", height = 17, width = 17)
 
 ## ------------------------------------------------------------------------ ----
@@ -692,7 +693,7 @@ ggsave(pd, file = "figures/model_figures/D_partial_biomass.jpg",
 
 rm(list = setdiff(ls(), c(keep, "pa", "pb", "pc", "pd")))
 
-## Figure 2 - main model comparisons ----
+## Figure 3 - Main model comparisons ----
 
 # Adjust themes
 pA <- pa + 
@@ -742,7 +743,7 @@ final_plot <- row1 / row2 +
 
 # Save plot
 ggsave(
-  "figures/figure_3.jpg",
+  "figures/main_figures/figure_3.jpg",
   plot = final_plot,
   width = 17,
   height = 19,
@@ -781,7 +782,7 @@ p <- ggplot(data = plot_data, aes(x = term, y = estimate, color = model)) +
   coeff_theme() +
   theme(aspect.ratio = 1.45)
 
-ggsave(p, file = "figures/model_figures/supplementary_pielou.jpg",
+ggsave(p, file = "figures/supplementary_figures/supplementary_pielou.jpg",
        unit = "cm", height = 9, width = 13, dpi = 1200)
 
 rm(list = setdiff(ls(), keep))
@@ -999,7 +1000,8 @@ p <- ggplot(data = no_f_data, aes(x = term, y = estimate, color = model)) +
   coeff_theme()  +
   theme(aspect.ratio = 1.15)
 
-ggsave(p, file = "figures/model_figures/G_diversity_no_fishing.jpg",
+ggsave(p, 
+       file = "figures/supplementary_figures/supplementary_diversity_no_fishing.jpg",
        unit = "cm", height = 6.5, width = 13, dpi = 1200)
 
 # Plot for models with fishing
@@ -1029,7 +1031,8 @@ p <- ggplot(data = f_data, aes(x = term, y = estimate, color = model)) +
   coeff_theme() +
   theme(aspect.ratio = 1.15)
 
-ggsave(p, file = "figures/model_figures/H_diversity_with_fishing.jpg",
+ggsave(p,
+       file = "figures/supplementary_figures/supplementary_diversity_with_fishing.jpg",
        unit = "cm", height = 6.5, width = 13, dpi = 1200)
 
 rm(list = setdiff(ls(), "map_theme"))
@@ -1399,88 +1402,4 @@ ggsave(p, file = "figures/maps/haul_number.jpg",
 
 rm(list = setdiff(ls(), c("plot_data", "xlim", "ylim", "map_theme")))
 
-## Variable maps (point) ----
-
-# Responses to plot
-res <- c(
-  "log_sum_fishing",
-  "log_total_biomass",
-  "log_commercial_biomass",
-  "log_gadus_morhua",
-  "sbt_mean",
-  "tric",
-  "teve",
-  "kde_fric",
-  "kde_feve"
-)
-
-titles <- c(
-  "Fishing effort",
-  "Total biomass",
-  "Commercial biomass",
-  "Cod biomass",
-  "Mean SBT",
-  "Tric",
-  "Teve",
-  "KDE Fric",
-  "KDE Feve"
-)
-
-unit <- c(
-  "log(hours/year)",
-  "log(kg/km2)",
-  "log(kg/km2)",
-  "log(kg/km2)",
-  "°C",
-  "N° species",
-  rep(" ", 3)
-)
-
-# Variables' rounding 
-round <- c(rep(10, 6), rep(100, 3))
-
-# Land shape
-land <- sf::st_crop(ne_countries(scale = "medium", returnclass = "sf"),
-                    xmin = -10, xmax = 65, 
-                    ymin = 55, ymax = 90) |>
-  sf::st_transform(crs = st_crs(plot_data)) 
-
-# Compute mean values over the study area, plot and save
-for (i in 1:length(res)) { 
-  
-  max <- ceiling(quantile(plot_data[[res[i]]], .95, na.rm = TRUE) * 
-                   round[i])/round[i]
-  min <- floor(quantile(plot_data[[res[i]]], .05, na.rm = TRUE) * 
-                 round[i])/round[i]
-  
-  p <- ggplot() +
-    geom_sf(data = plot_data,
-            aes(color = get(res[i])),
-            size = .5) +
-    geom_sf(data = land, fill = "gray40", color = "gray40") +
-    scale_x_continuous(limits = xlim) +
-    scale_y_continuous(limits = ylim) +
-    scale_color_gradientn(colors = c(
-      "#003f5c", 
-      "lightblue", 
-      "gray85",
-      "#e48646", 
-      "darkred"),
-      na.value = NA,
-      oob = scales::squish,   # cap values outside limits
-      limits = c(min, max), 
-      name = paste0(unit[i], " \n"),
-      breaks = seq(min, max, length = 2)) + 
-    labs(x = "\nLongitude", y = "Latitude\n",
-         title = titles[i]) + 
-    guides(color = guide_colorbar(barwidth = 1.5,
-                                 barheight = .2,
-                                 ticks = FALSE)) +
-    map_theme() 
-  
-  ggsave(p, file = paste0("figures/maps/point_version/", res[i], "_point.jpg"),
-         width = 4, height = 6, units = "cm")
-}
-
 ## End
-
