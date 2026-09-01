@@ -19,6 +19,9 @@ data/original/*
 # include trait data
 !data/original/TraitCollectionFishNAtlanticNEPacificContShelf.csv
 
+# include EEZ data
+!data/original/EEZ/
+
 data/intermediate/*
 
 
