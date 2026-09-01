@@ -1,482 +1,942 @@
 
-### Find out if there is a mistake in Teve
 
-## Community data cleaning ----
+## Partial biomass models withou FD or TD ----
 
-# Load data for 2004-2021 (FISHGLOB_data) AND 2022 (Laurene Pecouchet)
-load("data/original/NOR-BTS_clean.RData") 
-load("data/original/BESS_data2022.RData")
-
-# Bind and filter to retain only the Barents Sea Ecosystem Survey data (https://github.com/AquaAuma/FishGlob_data/tree/main/metadata_docs#norway-nor-bts)
-nor_full <- data %>% 
-  rbind(data2022) %>%                 
-  filter(
-    gear %in% c("3270","3271"), 
-    latitude > 70,              
-    month %in% c("08", "09"))  
-
-length(unique(nor_full$haul_id)) # 3932 hauls
-
-# Exlcude deviations from 15 minutes and non-shelf areas
-community_filtered <- nor_full %>% filter(  
-  between(haul_dur, 10, 20), 
-  depth < 500)                
-
-# Save filtered community data
-save(community_filtered, file = "data/test/community_filtered.RData")
-
-rm(list = setdiff(ls(), "community_filtered")) # cleaning
-
-## Compute biomass 
-
-# Unique taxa 
-length(unique(community_filtered$accepted_name)) # n = 106
-
-# Total biomass per haul 
-total_biomass <- community_filtered %>%    
-  group_by(haul_id) %>%
-  summarize(total_biomass = sum(wgt_cpua, na.rm = TRUE)) 
-
-# Species biomass per haul
-species_biomass <- community_filtered %>%  
-  group_by(haul_id, accepted_name) %>%
-  summarize(biomass = sum(wgt_cpua, na.rm = TRUE)) %>%
-  pivot_wider(
-    names_from = accepted_name,
-    values_from = biomass,
-    values_fill = 0  
-  )
-
-top_10 <- community_filtered %>%
-  group_by(accepted_name) %>%
-  summarize(biomass = sum(wgt_cpua, na.rm = TRUE)) %>%
-  arrange(desc(biomass)) %>%
-  slice_head(n = 10) %>%
-  mutate(fraction = biomass/sum(community_filtered$wgt_cpua, na.rm = TRUE))
-
-# Merge and keep only top 10 species
-biomass <- total_biomass %>%
-  left_join(species_biomass, by = "haul_id") %>%
-  select(c("haul_id", "total_biomass", top_10$accepted_name)) %>%
-  janitor::clean_names()
-
-# Save clean biomass data
-save(biomass, file = "data/test/biomass.RData")
-
-# Load filtered community data and trait data
-load("data/test/community_filtered.RData")
-
-# Taxonomic richness, evenness (Pielou's), and diversity (Shannon-Wiener)
-taxonomic_diversity <- community_filtered %>%
-  group_by(haul_id) %>%
-  summarize(Tric = vegan::specnumber(accepted_name),
-            Teve = vegan::diversity(num_cpua)/log(specnumber(accepted_name)),
-            Tdiv = vegan::diversity(num_cpua))
-
-save(taxonomic_diversity, file = "data/test/taxonomic_diversity.RData")
-
-# Haul positions
-load("data/test/community_filtered.RData")
-
-haul_point <-  community_filtered %>%
-  group_by(haul_id, latitude, longitude, year) %>%
-  summarize(depth = mean(depth)) %>%  # this allows to have one raw per haul 
-  st_as_sf(coords = c("longitude", "latitude"), 
-           crs = 4326) %>%            # transform to point vector (sf object)
-  st_transform(crs = "+proj=laea +lat_0=75 +lon_0=30 +datum=WGS84 +units=km +no_defs")   
-
-save(haul_point, file = "data/test/haul_point.RData")
-
-#
-## Copernicus files ----
-
-# sst, sbt and sic (2003 - Jun 2021)  
-phy_stack_1 <- rast("data/original/cmems_mod_glo_phy_my_0.083deg_P1M-m_1738920541876.nc")
-
-# sst, sbt and sic (Jul 2021 - 2024) 
-phy_stack_2 <- rast("data/original/cmems_mod_glo_phy_myint_0.083deg_P1M-m_1741103917033.nc")
-
-# Stack the stacks
-phy_stack <- c(phy_stack_1, phy_stack_2) # using terra::c 
-
-# Extract year from time stamp
-phy_times <- time(phy_stack)
-years <- format(phy_times, "%Y")
-
-# Retain layers from Jan 2004 to Dec 2022
-phy_stack <- phy_stack[[!years %in% c("2003", "2023", "2024")]] # 2003 was downloaded to use "12 months before sampling"
-
-# Subset to compute each variable on its own
-sst_stack <- phy_stack[[grep("thetao", names(phy_stack))]]  # sst
-sbt_stack <- phy_stack[[grep("bottomT", names(phy_stack))]] # sbt
-sic_stack <- phy_stack[[grep("siconc", names(phy_stack))]]  # sic
-
-rm(phy_stack, phy_stack_1, phy_stack_2, phy_times, years) # cleaning
-
-# Visual check for raster time continuity 
-#plot(sic_stack[[210:221]])
-
-# Chla (2003-2024) 
-chla_stack <- rast("data/original/cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km_P1M_1738579225409.nc")
-
-# Extract year from time stamp
-chla_times <- time(chla_stack)
-years <- format(chla_times, "%Y")
-
-# Retain layers from Jan 2004 to DEc 2022
-chla_stack <- chla_stack[[!years %in% c("2003", "2023", "2024")]] # 2003 was downloaded to use "12 months before sampling"
-
-# Vector for loops
-stacks <- c("sst_stack", "sbt_stack", "sic_stack", "chla_stack")
-vars <- c("sst", "sbt", "sic", "chla")
-
-#
-## Compute yearly mean and sd values 
-
-# Vectors for the loops
-stacks <- c("sst_stack", "sbt_stack", "sic_stack", "chla_stack")
-vars <- c("sst", "sbt", "sic", "chla")
-
-# Compute mean values by year 
-for (i in 1:length(stacks)){
-  t <- time(get(stacks[i]))  # extract the time dimension format
-  y <- format(t, "%Y")    # convert dates to years (index for mean calculation)
-  m <- tapp(get(stacks[i]), index = y, # compute the mean per cell per year
-            fun = mean, na.rm = TRUE)
-  unique_y <- as.numeric(gsub("X", "", names(m))) # years of the aggregation 
-  time(m) <- unique_y # assign the new time values to the raster stack
-  writeRaster(m, file = paste0(  
-    "data/test/", vars[i], "_mean.tif"), overwrite = TRUE)  # save raster
-  rm(y, t, m, unique_y)
-}
-
-# Compute sd values by year 
-for (i in 1:length(stacks)){
-  t <- time(get(stacks[i]))  # extract the time dimension format
-  y <- format(t, "%Y")    # convert dates to years (index for mean calculation)
-  m <- tapp(get(stacks[i]), index = y, # compute the sd per cell per year
-            fun = sd, na.rm = TRUE)
-  unique_y <- as.numeric(gsub("X", "", names(m))) # years of the aggregation 
-  time(m) <- unique_y # assign the new time values to the raster stack
-  writeRaster(m, file = paste0(  
-    "data/test/", vars[i], "_sd.tif"), overwrite = TRUE)  # save raster
-  rm(y, t, m, unique_y)
-}
-
-rm(sst_stack, sbt_stack, sic_stack, chla_stack, i, stacks, vars) 
-
-## Extract raster values at haul level 
-
-# Load haul positions
-load("data/test/haul_point.RData")
-
-# Output data frame
-warming <- data.frame(haul_id = haul_point$haul_id,
-                      geometry = haul_point$geometry,
-                      year = haul_point$year,
-                      depth = haul_point$depth)
-
-# Vectors for the loops
-vars <- c("sst", "sbt", "sic", "chla") # outer loop
-vars_mean <- c("sst_mean", "sbt_mean", "sic_mean", "chla_mean") # outer loop
-vars_sd <- c("sst_sd", "sbt_sd", "sic_sd", "chla_sd") # outer loop
-y <- 2004:2022 # inner loop 
-
-# Loop to extract mean values
-for (k in 1:length(vars_mean)){
-  # Import the raster 
-  var_mean <- rast(paste0(   # import mean rasters
-    "data/test/", vars[k], "_mean.tif"))
-  
-  # Project as haul_point (new resolution is 3464.996 x 3464.996 m for phy and 1727.024 x 1727.024 m for chla)
-  equal <- project(var_mean, 
-                   "+proj=laea +lat_0=75 +lon_0=30 +datum=WGS84 +units=km +no_defs",
-                   res = 2) 
-  
-  # Filter the vector and raster by year
-  point_vars <- dplyr::filter(haul_point, year == y[1]) # this will be the product
-  raster <- equal[[1]] 
-  
-  # Extract the raster values at the points 
-  var <- terra::extract(x = raster, y = vect(point_vars), # extract raster values
-                        method = "bilinear") # interpolates from closest 4 cells
-  
-  # Add the values as a  new column to the vector
-  point_vars[[vars_mean[k]]] <- var[, -1] 
-  
-  # Loop to paste all subsequent years
-  for (i in 2:length(y)){ # the first was done outside the loop
-    point <- dplyr::filter(haul_point, year == y[i]) # this will be the final df
-    raster <- equal[[i]] 
-    var <- terra::extract(x = raster, y = vect(point), # extract raster values
-                          method = "bilinear") # interpolates from closest 4 cells
-    point[[vars_mean[k]]] <- var[, -1]
-    point_vars <- rbind(point_vars, point)
-  }
-  
-  # Remove unwanted columns
-  point_vars <- select(point_vars, - c(depth, year))
-  
-  # Join to the final dataset
-  warming <- left_join(warming, point_vars,
-                       by = c("haul_id" = "haul_id",
-                              "geometry" = "geometry"))
-  
-  rm(raster, var, point, equal, var_mean, point_vars) # cleaning
-}
-
-# Loop to extract sd values
-for (k in 1:length(vars_sd)){
-  # Import the raster 
-  var_sd <- rast(paste0(   # import mean rasters
-    "data/test/", vars[k], "_sd.tif"))
-  
-  # Project as haul_point 
-  equal <- project(var_sd, 
-                   "+proj=laea +lat_0=75 +lon_0=30 +datum=WGS84 +units=km +no_defs",
-                   res = 2) 
-  
-  # Filter the vector and raster by year
-  point_vars <- dplyr::filter(haul_point, year == y[1]) 
-  raster <- equal[[1]] 
-  
-  # Extract the raster values at the points 
-  var <- terra::extract(x = raster, y = vect(point_vars), # extract raster values
-                        method = "bilinear") # interpolates from closest 4 cells
-  
-  # Add the values as a  new column to the vector
-  point_vars[[vars_sd[k]]] <- var[, -1] 
-  
-  # Loop to paste all subsequent years
-  for (i in 2:length(y)){ # the first was done outside the loop
-    point <- dplyr::filter(haul_point, year == y[i]) # this will be the final df
-    raster <- equal[[i]] 
-    var <- terra::extract(x = raster, y = vect(point), # extract raster values
-                          method = "bilinear") # interpolates from closest 4 cells
-    point[[vars_sd[k]]] <- var[, -1]
-    point_vars <- rbind(point_vars, point)
-  }
-  
-  # Remove unwanted columns
-  point_vars <- select(point_vars, - c(depth, year))
-  
-  # Join to the final dataset
-  warming <- left_join(warming, point_vars,
-                       by = c("haul_id" = "haul_id",
-                              "geometry" = "geometry"))
-  
-  rm(raster, var, point, equal, var_sd, point_vars) # cleaning
-}
-
-rm(vars, vars_mean, vars_sd, y, i, k)
-
-# Save 
-save(warming, file = "data/test/warming.RData")
-
-rm(list = ls())
-
-## Merge data ----
-# Biomass
-load("data/test/biomass.Rdata")
-
-# Taxonomic diversity
-load("data/test/taxonomic_diversity.Rdata")
-
-# Haul position, depth and warming variables
-load("data/test/warming.RData")
-
-# Functional diversity
-load("data/test/functional_diversity.Rdata")
-
-## Join data, correct NAs and duplicated coordinates ----
-
-# Join, correct NAs and project to equidistant
-plotting_data <- biomass %>% 
-  left_join(taxonomic_diversity, by = "haul_id") %>% 
-  left_join(functional_diversity, by = "haul_id") %>%
-  left_join(warming, by = "haul_id") %>%
-  mutate(
-    log_biomass = log(total_biomass),
-    log_cod_biomass = log(gadus_morhua + 0.00001),
-    across(c(sic_mean, sic_sd), ~ replace_na(., 0)))%>%
-  mutate(
-         log_chla_mean = log(chla_mean)) %>%
-  st_as_sf(crs = "+proj=laea +lat_0=75 +lon_0=30 +datum=WGS84 +units=km +no_defs") %>% 
-  st_transform(crs = "+proj=aeqd +lat_0=75 +lon_0=30 +datum=WGS84 +units=km +no_defs") 
-
-
-# Fix duplicated coordinates
-
-# Remove geometry
-r <- plotting_data %>%
-  mutate(latitude = st_coordinates(.)[, 2],      # extract latitude
-         longitude = st_coordinates(.)[, 1]) %>% # extract longitude
-  st_drop_geometry() 
-
-# Check identical coordinates
-dup_coord <- r[c(which(duplicated(r$longitude, fromLast = TRUE)),
-                 which(duplicated(r$longitude, fromLast = FALSE))),] |>
-  group_by(haul_id, year, latitude, longitude) |> summarize(depth = mean(depth))
-
-
-# This may create problems in the analysis, so longitude is modified 
-# by an insignificant amount
-sample(r$longitude, 5) # 5 decimals
-r[which(duplicated(r$longitude, fromLast = TRUE)),]$longitude <- 
-  r[which(duplicated(r$longitude, fromLast = TRUE)),]$longitude + 0.00001
-
-# Check
-r[which(duplicated(r$longitude, fromLast = TRUE)),]$longitude
-
-# Save csv
-write.table(r, file = "data/test/final_data.csv", sep = ",") 
-
-rm(list = ls())
-
-
-## Compare datasets ----
-
-old_data <- read.csv("data/test/final_data.csv", sep = ",")
-new_data <- read.csv("data/final/final_data.csv", sep = ",")
-
-evenness_data <- new_data %>% rename(
-  "New_Fric" = "kde_fric",
-  "New_Feve" = "kde_feve",
-  "Teve" = "teve",
-  "Tric" = "tric",
-  "P_Teve" = "p_teve"
-) %>%
-  left_join(select(old_data, "haul_id", "Old_Fric" = "Fric", "Old_Feve" = "Feve"))
-
-
-plot(evenness_data$Old_Fric, evenness_data$P_Teve)
-
-plot(evenness_data$New_Fric, evenness_data$P_Teve)
-
-## Test through models ----
-
-
-# Prepare data
-b_data <- evenness_data
-
-sp <- c("gadus_morhua",
-        "melanogrammus_aeglefinus",
-        "sebastes_mentella",
-        "micromesistius_poutassou",
-        "hippoglossoides_platessoides",
-        "mallotus_villosus",
-        "pollachius_virens",
-        "boreogadus_saida",
-        "trisopterus_esmarkii",
-        "reinhardtius_hippoglossoides")
+# These models investigate the effect of the progressive removal of 
+# dominant species from the total_biomass. 
+# Note that data exploration is the same as general_model
 
 new_res <- paste0("remove_", 1:10)
 
-for (i in 1:length(new_res)) {
-  b_data[[new_res[i]]] <- b_data[["total_biomass"]] - rowSums(b_data[sp[1:i]])
+# Prepare data
+biomass_data <- final_data %>%
+  select(         
+    all_of(recurring_vars),
+    starts_with("remove"),
+    log_sum_fishing
+  ) 
+
+# Responses distribution
+par(mfrow = c(3, 4), mar = c(2, 4, 2, 1)) 
+
+for (i in 1:length(new_res)) { 
+  
+  plot(density(log(biomass_data[[paste0(new_res[i], "_biomass")]])),
+       main = paste0(new_res[i], "_biomass"))
 }
 
-biomass_data <- b_data %>%
-  select(c(total_biomass, all_of(new_res), # response
-           Tric, Teve, P_Teve,     
-           Old_Fric, Old_Feve,
-           New_Fric, New_Feve,
-           sst_mean, sst_sd,       # surface temperature
-           sbt_mean, sbt_sd,       # bottom temperature
-           sic_mean,  log_chla_mean,# productivity
-           year, depth, longitude, latitude, haul_id)) %>%
-  drop_na() %>%
-  mutate(across(starts_with("remove_"), ~ .x + 0.0001), # a few observations are slightly negative due to rounding
-         across(-c(haul_id, total_biomass, all_of(new_res), year, latitude, longitude),
-                base::scale))
+par(mfrow = c(1, 1)) 
+
+# Collinearity (vif only)
+for (i in 1:length(new_res)) { 
+  
+  message(new_res[i])
+  
+  x <- final_data %>%
+    select(
+      paste0(new_res[i], "_tric"),
+      paste0(new_res[i], "_teve"),
+      paste0(new_res[i], "_kde_fric"),
+      paste0(new_res[i], "_kde_feve"),
+      "sbt_mean",
+      "sbt_sd",
+      "sst_sd",
+      #"sic_mean",
+      "depth",
+      "log_chla_mean",
+      "log_sum_fishing"
+    ) %>%
+    drop_na() %>%
+    vif()
+  
+  print(x)
+  
+}
+
+# In some data sets sic_mean and/or sbt_mean surpass the VIF threshold 
+# We remove sic_mean from all models to keep them comparable and remove all
+# excessive correlations. sic_mean was not a driver in the general model and 
+# does not become an important one in the partial biomass models if kept.
 
 # Models
-load("tools/model_selection_functions.RData")
+for (i in 1:length(new_res)) { 
+  
+  # Identify new response
+  response <- paste0(new_res[i], "_biomass")
+  
+  data <- biomass_data %>%
+    select(
+      paste0(new_res[i], c(
+        "_biomass",
+        "_kde_fric",
+        "_kde_feve",
+        "_tric",
+        "_teve")),
+      sbt_mean,
+      sbt_sd,
+      sst_sd,
+      #sic_mean,        
+      log_chla_mean,
+      depth,
+      log_sum_fishing, 
+      haul_id,
+      year, 
+      latitude,
+      longitude) %>%
+    drop_na() %>%
+    filter(.data[[response]] > 0) %>%
+    mutate(
+      across(
+        -c(
+          ends_with("biomass"),
+          haul_id,
+          year, 
+          latitude,
+          longitude
+        ), ~ as.numeric(scale(.)))) 
+  
+  # Fitting 
+  model <- model_selection(
+    directory = "models/test",
+    name = response,
+    data = data,
+    mesh_cutoff = 60, 
+    family = lognormal(link = "log"),
+    fixed_formula = as.formula(paste0( # this allows to loop the function
+      new_res[i], "_biomass  ~", 
+     # new_res[i], "_kde_fric +",
+      #new_res[i], "_kde_feve +",
+      new_res[i], "_tric +",
+      new_res[i], "_teve + 
+      sbt_mean +
+      sbt_sd +
+      sst_sd +        
+      log_chla_mean +
+      depth +
+      log_sum_fishing"
+    )))
+  
+  message(
+    "\n======================================================================\n",
+    paste0(new_res[i], " model fitted and inspected"),
+    "\n======================================================================\n"
+  )
+  
+}
 
-# Test one model
-model <- manual_random_model_selection(
-  directory = "data/test",
-  name = "test_model",
-  data = biomass_data,
+csv_files <- list.files(
+  path = "models/test",
+  pattern = ".csv$",
+  full.names = TRUE
+)
+
+combined_csv <- bind_rows(lapply(csv_files, read.csv)) |>
+  filter(term !="(Intercept)")
+
+write.csv(combined_csv,
+          file = "models/test/biomass_models_coefficients.csv")
+
+
+# Read biomass coefficient data
+biomass_coeff <- read.csv(
+  file = "models/test/biomass_models_coefficients.csv",
+  sep = ",") 
+
+remove <- paste0("remove_", 1:10, "_biomass")
+
+# Identify levels
+biomass_coeff$model <- factor(biomass_coeff$model, 
+                              levels = paste0("remove_", 1:10, "_biomass"))
+
+# Rename levels
+levels(biomass_coeff$model) <- paste0("-Top ", 1:10)
+
+# Rename levels
+biomass_coeff <- biomass_coeff %>%
+  mutate(
+    term = case_when(
+      grepl("tric", term) ~ "tric",
+      grepl("teve", term) ~ "teve",
+      grepl("fric", term) ~ "fric",
+      grepl("feve", term) ~ "feve",
+      TRUE ~ term),
+    # Add significance column
+    significance = case_when(
+      conf.low * conf.high > 0 ~ "Significant",
+      conf.low * conf.high <= 0 ~ "Not significant"
+    )) %>%
+  select(-X)
+
+
+# Identify levels
+biomass_coeff$term <- factor(biomass_coeff$term, levels = c(
+  "depth", 
+  "log_chla_mean",
+  "sst_sd",
+  "sbt_sd",
+  "sic_mean",
+  "sbt_mean",
+  "tric",
+  "teve",
+  "log_sum_fishing"
+))
+
+# Rename levels
+levels(biomass_coeff$term) <- c(
+  "Depth", 
+  "log chla mean",
+  "SST SD",
+  "SBT SD",
+  "SIC mean",
+  "SBT mean",
+  "Tric",
+  "Teve",
+  "log fish. eff."
+)
+
+# Plot
+cols <- colorRampPalette(c("black", "#2b9348", "#eeef20"))(11)
+
+p <- ggplot(data = biomass_coeff, aes(x = term, y = estimate, color = model)) +
+  geom_point(size = 1,
+             position = position_dodge(width = 0.8, reverse = TRUE)) +
+  geom_errorbar(aes(ymin = conf.low,
+                    ymax = conf.high),
+                width = 0,
+                position = position_dodge(width = 0.8, reverse = TRUE)) +
+  geom_hline(yintercept = 0, linetype = "dashed", linewidth = .3) +
+  scale_color_manual(values = cols[2:11]) +
+  coord_flip(ylim = c(-.5, .75)) +
+  scale_x_discrete(drop = FALSE) +
+  scale_y_continuous(
+    breaks = seq(-.5, .75, by = .25),
+    labels = c("-0.5", "-0.25", "0", "0.25", "0.5", "0.75"),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "D)",
+    x = "Model term\n",
+    y = "\nSlope ± CI",
+    color = "Model") +
+  coeff_theme() +
+  theme(aspect.ratio = 1.45)
+
+ggsave(p, file = "models/test/D_partial_biomass_no_FD.png",
+       unit = "cm", height = 9, width = 13)
+
+rm(list = setdiff(ls(), keep))
+
+## Plots of partial diversity ----
+# Load data
+data <- read.csv("data/final/final_data.csv", sep = ",")
+
+# Transform back to sf
+plot_data <- data %>%
+  sf::st_as_sf(
+    coords = c("longitude", "latitude"), 
+    crs = "+proj=aeqd +lat_0=76 +lon_0=27 +datum=WGS84 +units=km +no_defs") 
+
+# Data limits
+xlim <- st_bbox(plot_data)[c("xmin", "xmax")] + c(-5, 35)
+ylim <- st_bbox(plot_data)[c("ymin", "ymax")] + c(0, 0) 
+
+# Continuous grid to bin the observations (65 km cells)
+g <- plot_data %>%
+  sf::st_make_grid(cellsize = 65,  
+                   what = "polygons",
+                   square = TRUE, 
+                   offset = st_bbox(plot_data)[c("xmin", "ymin")] +
+                     c(-15, -30)) %>%
+  sf::st_as_sf() 
+
+# Spatial join (inner join) to match observations to cells
+grid_r <- st_join(g, plot_data, left = FALSE) 
+
+# Check observation number per cell (ideally = n of years)
+cell_counts <- grid_r %>%
+  group_by(x) %>%
+  summarize(n_obs = n(), .groups = "drop")
+
+prop.table(table((cell_counts$n_obs > 5))) 
+
+# Responses to plot
+res <- c(
+  "total_biomass",
+  paste0("remove_", 1:10, "_biomass")
+)
+
+titles <- res
+
+unit <- rep("", 11)
+
+# Variables' rounding 
+round <- c(rep(100, 11))
+
+# Land shape
+land <- sf::st_crop(ne_countries(scale = "medium", returnclass = "sf"),
+                    xmin = -10, xmax = 65, 
+                    ymin = 55, ymax = 90) |>
+  sf::st_transform(crs = st_crs(plot_data)) 
+
+# Compute mean values over the study area, plot and save
+for (i in 1:length(res)) { 
+  
+  grid_mean <- grid_r %>%
+    group_by(x) %>%
+    summarize(mean = mean(log(get(res[i]) + 0.0001), na.rm = TRUE)) %>%
+    st_as_sf()
+  
+  max <- ceiling(quantile(grid_mean$mean, .95, na.rm = TRUE) *
+                   round[i])/round[i]
+  min <- floor(quantile(grid_mean$mean, .05, na.rm = TRUE) *
+                 round[i])/round[i]
+  
+  p <- ggplot() +
+    geom_sf(data = grid_mean, aes(fill = mean), color = NA) +
+    geom_sf(data = land, fill = "gray40", color = "gray40") +
+    scale_x_continuous(limits = xlim) +
+    scale_y_continuous(limits = ylim) +
+    scale_fill_gradientn(colors = c(
+      "#003f5c", 
+      "lightblue", 
+      "gray85",
+      "#e48646", 
+      "darkred"),
+      oob = scales::squish,
+      limits = c(min, max), 
+      name = paste0(unit[i], " \n"),
+      breaks = seq(min, max, length = 2)) + 
+    labs(x = "\nLongitude", y = "Latitude\n",
+         title = titles[i]) + 
+    guides(fill = guide_colorbar(barwidth = 1.5,
+                                 barheight = .2,
+                                 ticks = FALSE)) +
+    map_theme() 
+  
+  ggsave(p, file = paste0("figures/remove_biomass_maps/", res[i], "_grid.png"),
+         width = 4, height = 6, units = "cm")
+}
+
+## check partial diversity effect ----
+p <- read.csv(
+  file = "models/biomass/different_diversity/biomass_models_coefficients.csv",
+  sep = ",")  |> select(-X)
+
+biomass_coeff <- read.csv(
+  file = "models/biomass/biomass_models_coefficients.csv",
+  sep = ",") |> select(-X)
+
+plot_coeff <- rbind(p, general)
+
+# Identify levels
+plot_coeff$model <- factor(plot_coeff$model, 
+                              levels = c(
+                                "general_biomass",
+                                paste0("remove_", c(1, 5, 10), "_biomass")
+                              ))
+
+# Rename levels
+levels(plot_coeff$model) <- c(
+  "General",
+  paste0("-Top ", c(1, 5, 10))
+)
+
+plot_coeff <- plot_coeff %>%
+  mutate(
+    term = case_when(
+      grepl("tric", term) ~ "tric",
+      grepl("teve", term) ~ "teve",
+      grepl("fric", term) ~ "fric",
+      grepl("feve", term) ~ "feve",
+      TRUE ~ term
+    )
+  )
+
+# Identify levels
+plot_coeff$term <- factor(plot_coeff$term, levels = c(
+  "depth", 
+  "log_chla_mean",
+  "sst_sd",
+  "sbt_sd",
+  "sic_mean",
+  "sbt_mean",
+  "fric",
+  "feve",
+  "tric",
+  "teve",
+  "log_sum_fishing"
+))
+
+# Rename levels
+levels(plot_coeff$term) <- c(
+  "Depth", 
+  "log chla mean",
+  "SST SD",
+  "SBT SD",
+  "SIC mean",
+  "SBT mean",
+  "Fric",
+  "Feve",
+  "Tric",
+  "Teve",
+  "log fish. eff."
+)
+
+cols <- colorRampPalette(c("black", "#2b9348", "#eeef20"))(11)
+
+p <- ggplot(data = plot_coeff, aes(x = term, y = estimate, color = model)) +
+  geom_point(size = 1,
+             position = position_dodge(width = 0.6, reverse = TRUE)) +
+  geom_errorbar(aes(ymin = conf.low,
+                    ymax = conf.high),
+                width = 0,
+                position = position_dodge(width = 0.6, reverse = TRUE)) +
+  geom_hline(yintercept = 0, linetype = "dashed", linewidth = .3) +
+  scale_color_manual(values = cols[c(1, 2, 6, 11)]) +
+  coord_flip() +
+  scale_x_discrete(drop = FALSE) +
+  scale_y_continuous(
+    limits = c(-.75, .75),
+    breaks = seq(-.75, .75, by = .25),
+    labels = c("-0.75", "-0.5", "-0.25", "0", "0.25", "0.5", "0.75"),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "D) - partial diversity",
+    x = "Model term\n",
+    y = "\nSlope ± CI",
+    color = "Model") +
+  theme(     
+    aspect.ratio = 1.2,
+    plot.margin = margin(0, 0, 0, 0),
+    legend.position = "right",
+    legend.justification = "top",
+    legend.margin = margin(0, 0, 0, 0),
+    legend.key.width = unit(0.2, "cm"),
+    legend.text = element_text(margin = margin(l = 2, r = 2), size = 10),
+    legend.title = element_text(size = 12),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 10),
+    axis.ticks = element_blank(),
+    title = element_text(size = 13),
+    panel.background = element_rect(fill = "white", color = NA),
+    panel.border = element_rect(color = "gray70", fill = NA, linewidth = 0.3),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(color = "gray92", linewidth = 0.3)
+  ) 
+
+p
+
+ggsave(p, file = "figures/model_figures/D_partial_biomass(partial_diversity).png",
+       unit = "cm", height = 9, width = 13)
+
+### Issues with boreal model ----
+model <- manual_model_selection(
+  directory = "models",
+  name = "boreal_biomass",
+  data = boreal_data,
+  mesh_cutoff = 60,  
   random_selection = "spatiotemporal_random_fields_ar1",
-  mesh_cutoff = 100, 
   family = lognormal(link = "log"),
-  fixed_formula = remove_8 ~  
-    #P_Teve +
-    Teve +
-    Tric +
-    New_Feve +
-    New_Fric +
-    #Old_Fric +
-    #Old_Feve +
-    sbt_mean +
+  fixed_formula = total_biomass ~  
+    kde_fric +
+    kde_feve +      
+    tric +
+    teve +     
+    #sst_mean +      
+    sbt_mean +       
+    sic_mean + 
     sbt_sd +
     sst_sd +
-    sic_mean +        
+    #sic_sd + 
+    log_chla_mean +
+    #log_chla_sd +
+    depth
+)
+
+boreal_data$latitude <- round(boreal_data$latitude)
+boreal_data$longitude <- round(boreal_data$longitude)
+
+### Issues with kde diversity models ----
+model_gaus <- manual_model_selection(
+  directory = "models",
+  name = "kde_fric_gaus",
+  data = general_data,
+  mesh_cutoff = 60, 
+  family = gaussian(link = "identity"),
+  random_selection = "spatiotemporal_random_fields_ar1",
+  fixed_formula = kde_fric ~
+    sbt_mean +
+    sbt_sd +
+    #sst_mean +
+    sst_sd +
+    sic_mean + 
+    #sic_sd +
     log_chla_mean +
     depth
 )
 
-summary(model)
+sanity(model)$all_OK
 
+## Partial biomass models excluding top species from diversity metrics ----
+
+load("tools/install_load_packages_function.RData")
+
+# Load required packages
+install_load_packages(c(
+  "dplyr",
+  "ggplot2",
+  "tidyr",   
+  "sdmTMB", 
+  "DHARMa",
+  "pdftools",
+  "readr"
+))
+
+# read final data
+final_data <- read.csv("data/final/final_data.csv")
+
+# total community model
+model_data <- final_data %>% 
+  select(
+    tric,
+    teve, 
+    kde_fric,
+    kde_feve,
+    sbt_mean,       
+    sic_mean,
+    sbt_sd,
+    sst_sd,
+    log_chla_mean,
+    depth,
+    haul_id,
+    total_biomass,
+    year, 
+    latitude,
+    longitude
+) %>% 
+  drop_na() %>%
+  mutate(across(
+    -c(
+      haul_id,
+      total_biomass,
+      year, 
+      latitude,
+      longitude
+    ), ~ as.numeric(scale(.)))) 
+
+mesh <- make_mesh(model_data, 
+                  cutoff = 60,
+                  xy_cols = c("longitude", "latitude"))
+
+model <- sdmTMB(
+  data = model_data,
+  mesh = mesh,
+  family = lognormal(link = "log"),
+  spatial = "off",
+  spatiotemporal = "ar1",
+  time = "year",
+  reml = TRUE,
+  formula = total_biomass ~  
+    tric +
+    teve + 
+    kde_fric +
+    kde_feve +
+    sbt_mean +       
+    sic_mean + 
+    sbt_sd +
+    sst_sd +
+    log_chla_mean +
+    depth
+)
+
+sanity(model)$all_ok
+
+test_coeff <- data.frame(tidy(model), model = "General")
+
+# Loops
+new_res <- paste0("remove_", 1:10)
+
+model_names <- paste0("-Top ", 1:10)
+
+load("tools/vif_function.RData")
 
 for (i in 1:length(new_res)) {
   
-  name <- paste0(new_res[i], "_biomass")
+  message(new_res[i])
   
-  # Fitting
-  model <- random_model_selection(
-    directory = "data/test",
-    name = name,
-    data = biomass_data,
-    mesh_cutoff = 100, 
-    family = lognormal(link = "log"),
-    fixed_formula = as.formula(paste0( # this allows to loop the function
-      new_res[i],
-      "  ~  
-      Tric +
-      P_Teve + 
-      Old_Fric +
-      Old_Feve +
+  x <- final_data %>%
+    select(
+      paste0(new_res[i], "_tric"),
+      paste0(new_res[i], "_teve"),
+      paste0(new_res[i], "_kde_fric"),
+      paste0(new_res[i], "_kde_feve"),
+      "sbt_mean",
+      "sbt_sd",
+      "sst_sd",
+      "sic_mean",
+      "depth",
+      "log_chla_mean",
+      "log_sum_fishing"
+    ) %>%
+    drop_na() %>%
+    vif()
+  
+  print(x)
+  
+  }
+
+for (i in 1:length(new_res)) {
+  
+new_data <- final_data %>%
+  select(
+    paste0(new_res[i], "_biomass"),
+    paste0(new_res[i], "_tric"),
+    paste0(new_res[i], "_teve"),
+    paste0(new_res[i], "_kde_fric"),
+    paste0(new_res[i], "_kde_feve"),
+    "sbt_mean",
+    "sbt_sd",
+    "sst_sd",
+    "sic_mean",
+    "depth",
+    "log_chla_mean",
+    "log_sum_fishing",
+    "year",
+    "latitude",
+    "longitude",
+    "haul_id"
+  ) %>%
+  drop_na() %>%
+  mutate(across(
+    -c(
+      haul_id,
+      paste0(new_res[i], "_biomass"),
+      year, 
+      latitude,
+      longitude
+    ), ~ as.numeric(scale(.))))
+
+mesh <- make_mesh(new_data, cutoff = 60, xy_cols = c("longitude", "latitude"))
+
+model <- sdmTMB(
+  data = new_data,
+  mesh = mesh,
+  family = lognormal(link = "log"),
+  spatial = "off",
+  spatiotemporal = "ar1",
+  time = "year",
+  reml = TRUE,
+  formula = as.formula(paste0( # this allows to loop the function
+    new_res[i], "_biomass  ~",  
+      new_res[i], "_tric +",
+      new_res[i], "_teve +", 
+      new_res[i], "_kde_fric +",
+      new_res[i], "_kde_feve +
       sbt_mean +
       sbt_sd +
       sst_sd +
       sic_mean +        
       log_chla_mean +
-      depth")))
+      log_sum_fishing +
+      depth"
+  ))
+)
 
+print(new_res[i])
+print(sanity(model)$all_ok)
+
+coeff <- data.frame(tidy(model), model = model_names[i])
+
+test_coeff <- rbind(test_coeff, coeff)
 
 }
 
 ## Plot ----
+plot_coeff <- drop_na(test_coeff) |> filter(term != "(Intercept)")
 
-# Import csv files of model coefficients
-csv_name <- paste0("remove_", 2:10, "_biomass_model_coefficients.csv")
+plot_coeff$model <- factor(plot_coeff$model, levels = c("General", model_names))
 
-species <- read.csv(
-  file = "data/test/remove_1_biomass_model_coefficients.csv", sep = ",")
+plot_coeff <- plot_coeff %>%
+  mutate(
+    term = case_when(
+      grepl("tric", term) ~ "tric",
+      grepl("teve", term) ~ "teve",
+      grepl("fric", term) ~ "fric",
+      grepl("feve", term) ~ "feve",
+      TRUE ~ term
+    )
+  )
 
-for (i in 1:length(csv_name)) { # bind all the others
-  data <- read.csv(file = paste0("data/test/",
-                                 csv_name[i]), sep = ",")
-  species <- bind_rows(species, data)
+# Identify levels
+plot_coeff$term <- factor(plot_coeff$term, levels = c(
+  "depth", 
+  "log_chla_mean",
+  "sst_sd",
+  "sbt_sd",
+  "sic_mean",
+  "sbt_mean",
+  "fric",
+  "feve",
+  "tric",
+  "teve",
+  "log_sum_fishing"
+))
+
+# Rename levels
+levels(plot_coeff$term) <- c(
+  "Depth", 
+  "log chla mean",
+  "SST SD",
+  "SBT SD",
+  "SIC mean",
+  "SBT mean",
+  "Fric",
+  "Feve",
+  "Tric",
+  "Teve",
+  "log fish. eff."
+)
+
+cols <- colorRampPalette(c("black", "#2b9348", "#eeef20"))(11)
+
+p <- ggplot(data = plot_coeff, aes(x = term, y = estimate, color = model)) +
+  geom_point(size = 1,
+             position = position_dodge(width = 0.6, reverse = TRUE)) +
+  geom_errorbar(aes(ymin = conf.low,
+                    ymax = conf.high),
+                width = 0,
+                position = position_dodge(width = 0.6, reverse = TRUE)) +
+  geom_hline(yintercept = 0, linetype = "dashed", linewidth = .3) +
+  scale_color_manual(values = cols) +
+  coord_flip() +
+  scale_x_discrete(drop = FALSE) +
+  scale_y_continuous(
+    limits = c(-.75, .75),
+    breaks = seq(-.75, .75, by = .25),
+    labels = c("-0.75", "-0.5", "-0.25", "0", "0.25", "0.5", "0.75"),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "F)",
+    x = "Model term\n",
+    y = "\nSlope ± CI",
+    color = "Model") +
+  theme(     
+    aspect.ratio = 1.2,
+    plot.margin = margin(0, 0, 0, 0),
+    legend.position = "right",
+    legend.justification = "top",
+    legend.margin = margin(0, 0, 0, 0),
+    legend.key.width = unit(0.2, "cm"),
+    legend.text = element_text(margin = margin(l = 2, r = 2), size = 10),
+    legend.title = element_text(size = 12),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 10),
+    axis.ticks = element_blank(),
+    title = element_text(size = 13),
+    panel.background = element_rect(fill = "white", color = NA),
+    panel.border = element_rect(color = "gray70", fill = NA, linewidth = 0.3),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(color = "gray92", linewidth = 0.3)
+  ) 
+
+p
+
+ggsave(p, file = "figures/model_figures/partial_biomass_new_.png",
+       unit = "cm", height = 9, width = 13)
+
+## Old partial biomass exlusion ----
+
+# Read final data
+final_data <- read.csv("data/final/final_data.csv")
+
+# Load filtered community data
+load("data/intermediate/community_filtered.RData")
+
+# Total community model
+model_data <- final_data %>%
+  select(
+    total_biomass,
+    tric,
+    teve,
+    sst_mean,
+    sbt_mean,
+    sic_mean,
+    log_chla_mean,
+    sbt_sd,
+    sst_sd,
+    sic_sd,
+    log_chla_sd,
+    depth,
+   # log_sum_fishing,
+    year,
+    longitude,
+    latitude,
+    haul_id
+  ) %>%
+  drop_na() %>%
+  mutate(
+    across(
+      -c(
+        haul_id,
+        total_biomass,
+        year,
+        latitude,
+        longitude
+      ),
+      ~ as.numeric(scale(.))
+    )
+  )
+
+mesh <- make_mesh(
+  model_data,
+  cutoff = 60,
+  xy_cols = c("longitude", "latitude")
+)
+
+model <- sdmTMB(
+  data = model_data,
+  mesh = mesh,
+  family = lognormal(link = "log"),
+  spatial = "off",
+  spatiotemporal = "ar1",
+  time = "year",
+  reml = TRUE,
+  formula = total_biomass ~
+   # log_sum_fishing +
+    tric +
+    teve +
+    sbt_mean +
+    sic_mean +
+    sbt_sd +
+    sst_sd +
+    log_chla_mean +
+    depth
+)
+
+sanity(model)$all_ok
+
+test_coeff <- data.frame(
+  tidy(model),
+  model = "General"
+)
+
+
+# Sequential species removal
+top_10 <- c(
+  "Gadus morhua",
+  "Melanogrammus aeglefinus",
+  "Sebastes mentella",
+  "Micromesistius poutassou",
+  "Hippoglossoides platessoides",
+  "Mallotus villosus",
+  "Pollachius virens",
+  "Boreogadus saida",
+  "Trisopterus esmarkii",
+  "Reinhardtius hippoglossoides"
+)
+
+new_res <- paste0("-Top ", 1:10)
+
+other_vars <- final_data %>%
+  select(
+    sst_mean,
+    sbt_mean,
+    sic_mean,
+    log_chla_mean,
+    sbt_sd,
+    sst_sd,
+    sic_sd,
+    log_chla_sd,
+    #log_sum_fishing,
+    depth,
+    year,
+    longitude,
+    latitude,
+    haul_id
+  )
+
+for (i in seq_along(new_res)) {
   
-  rm(data)
+  new_data <- community_filtered %>%
+    filter(!(taxon %in% top_10[1:i])) %>%
+    group_by(haul_id) %>%
+    summarize(
+      total_biomass = sum(wgt_cpua, na.rm = TRUE),
+      tric = length(num_cpua),
+      teve = log(1 / sum((num_cpua / sum(num_cpua))^2)) /
+        log(length(num_cpua)),
+      .groups = "drop"
+    ) %>%
+    left_join(other_vars, by = "haul_id") %>%
+    drop_na() %>%
+    mutate(
+      across(
+        -c(
+          haul_id,
+          total_biomass,
+          year,
+          latitude,
+          longitude
+        ),
+        ~ as.numeric(scale(.))
+      )
+    )
+  
+  mesh <- make_mesh(
+    new_data,
+    cutoff = 60,
+    xy_cols = c("longitude", "latitude")
+  )
+  
+  model <- sdmTMB(
+    data = new_data,
+    mesh = mesh,
+    family = lognormal(link = "log"),
+    spatial = "off",
+    spatiotemporal = "ar1",
+    time = "year",
+    reml = TRUE,
+    formula = total_biomass ~
+     # log_sum_fishing +
+      tric +
+      teve +
+      sbt_mean +
+      sic_mean +
+      sbt_sd +
+      sst_sd +
+      log_chla_mean +
+      depth
+  )
+  
+  print(new_res[i])
+  print(sanity(model)$all_ok)
+  
+  coeff <- data.frame(
+    tidy(model),
+    model = new_res[i]
+  )
+  
+  test_coeff <- rbind(test_coeff, coeff)
 }
 
-# Data to plot
-plot_data <- species %>%
-  filter(term != "(Intercept)") %>%
-  drop_na() %>%
-  mutate(across(-c(model, term), as.numeric))
+## Plot ----
+plot_coeff <- drop_na(test_coeff) |> filter(term != "(Intercept)")
 
-plot_data$model <- factor(plot_data$model, 
-                          levels = c(paste0("remove_", 1:10, "_biomass")))
+plot_coeff$model <- factor(plot_coeff$model, levels = c("General", model_names))
 
-levels(plot_data$model) <- c("Pielou model", 
-                             paste0("Top ", 1:10, " removed"))
+plot_coeff <- plot_coeff %>%
+  mutate(
+    term = case_when(
+      grepl("tric", term) ~ "tric",
+      grepl("teve", term) ~ "teve",
+      TRUE ~ term
+    )
+  )
 
-plot_data$term <- factor(plot_data$term, levels = c(
+# Identify levels
+plot_coeff$term <- factor(plot_coeff$term, levels = c(
   "depth", 
   "log_chla_mean",
   "sst_sd",
@@ -485,36 +945,71 @@ plot_data$term <- factor(plot_data$term, levels = c(
   "sbt_mean",
   "Fric",
   "Feve",
-  "Tric",
-  "Teve"
+  "tric",
+  "teve",
+  "log_sum_fishing"
 ))
 
-# Plot
-cols <- colorRampPalette(c("black", "#2b9348", "#eeef20"))(10)
+# Rename levels
+levels(plot_coeff$term) <- c(
+  "Depth", 
+  "log chla mean",
+  "SST SD",
+  "SBT SD",
+  "SIC mean",
+  "SBT mean",
+  "Fric",
+  "Feve",
+  "Tric",
+  "Teve",
+  "log fish. eff."
+)
 
-p <- ggplot(data = plot_data, aes(x = term, y = estimate, color = model)) +
-  geom_point(size = 2,
-             position = position_dodge(width = 0.4)) +
+cols <- colorRampPalette(c("black", "#2b9348", "#eeef20"))(11)
+
+p <- ggplot(data = plot_coeff, aes(x = term, y = estimate, color = model)) +
+  geom_point(size = 1,
+             position = position_dodge(width = 0.6, reverse = TRUE)) +
   geom_errorbar(aes(ymin = conf.low,
                     ymax = conf.high),
                 width = 0,
-                position = position_dodge(width = 0.4)) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
+                position = position_dodge(width = 0.6, reverse = TRUE)) +
+  geom_hline(yintercept = 0, linetype = "dashed", linewidth = .3) +
   scale_color_manual(values = cols) +
   coord_flip() +
   scale_x_discrete(drop = FALSE) +
-  scale_y_continuous(limits = c(-.7, .9),
-                     breaks = seq(-.5, .75, by = .25)) +
-  theme_minimal(base_size = 14) +
-  theme(     
-    aspect.ratio = 1.75,
-    panel.grid.minor = element_blank()) +
+  scale_y_continuous(
+    limits = c(-.5, 1),
+    breaks = seq(-.5, .75, by = .25),
+    labels = c("-0.5", "-0.25", "0", "0.25", "0.5", "0.75"),
+    expand = c(0, 0)
+  ) +
   labs(
+    title = "F)",
     x = "Model term\n",
-    y = "\nCoefficient ± CI",
-    color = "Model")
+    y = "\nSlope ± CI",
+    color = "Model") +
+  theme(     
+    aspect.ratio = 1.2,
+    plot.margin = margin(0, 0, 0, 0),
+    legend.position = "right",
+    legend.justification = "top",
+    legend.margin = margin(0, 0, 0, 0),
+    legend.key.width = unit(0.2, "cm"),
+    legend.text = element_text(margin = margin(l = 2, r = 2), size = 10),
+    legend.title = element_text(size = 12),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 10),
+    axis.ticks = element_blank(),
+    title = element_text(size = 13),
+    panel.background = element_rect(fill = "white", color = NA),
+    panel.border = element_rect(color = "gray70", fill = NA, linewidth = 0.3),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(color = "gray92", linewidth = 0.3)
+  ) 
 
-ggsave(p, file = "figures/model_figures/a_pielou_species_effect.png",
-       unit = "cm", height = 20, width = 25) 
+p
 
-rm(list = setdiff(ls(), keep))
+ggsave(p, file = "figures/model_figures/partial_biomass_new_cpua.png",
+       unit = "cm", height = 9, width = 13)
+

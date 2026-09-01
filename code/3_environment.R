@@ -249,7 +249,7 @@ load("data/intermediate/community_filtered.RData")
 
 # Output data frame
 environmental_data <- community_filtered %>%
-  group_by(haul_id, year, latitude, longitude) %>%
+  group_by(haul_id, haul_dur, year, latitude, longitude) %>%
   summarize(depth = median(depth), .groups = "drop")
 
 # CRS for extraction (equal area)
@@ -359,7 +359,7 @@ rm(list = setdiff(ls(), c("environmental_data",
 
 # Final cleanup 
 environmental_data <- environmental_data %>%
-  select(!chla_sd) %>% # chla_sd makes little sense
+  #select(!chla_sd) %>% # chla_sd makes little sense
   mutate(
     across(c(sic_mean, sic_sd), # NA sic are actually 0
            ~ replace_na(., 0)),

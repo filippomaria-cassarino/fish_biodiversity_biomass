@@ -1,18 +1,8 @@
 ## File: 5_biomass_models.R
 ## Purpose: model the response of biomass to diversity, warming, and fishing
 ## Author: Filippomaria Cassarino
-## Date: 2 Apr 2026
+## Date: 31 Aug 2026
 ## Notes ----
-
-# All the correlation tables must be updated once the final set of
-# variables is selected
-
-# It would be nice to merge all .txt and .pdf at the end of the script 
-# to have them as attachments. It could also be just a pdf file
-
-## Model validation
-# general_biomass OK
-# fishing_biomass NOT OK
 
 ## Library ---- 
 
@@ -26,15 +16,15 @@ load("tools/vif_function.RData")
 load("tools/install_load_packages_function.RData")
 
 # Load required packages
-required_pakages <- c("dplyr",
-                      "ggplot2",
-                      "tidyr",   
-                      "sdmTMB", 
-                      "DHARMa",
-                      "pdftools",
-                      "readr") 
-
-install_load_packages(required_pakages)
+install_load_packages(c(
+  "dplyr",
+  "ggplot2",
+  "tidyr",   
+  "sdmTMB", 
+  "DHARMa",
+  "pdftools",
+  "readr"
+))
 
 # Recurring variables
 recurring_vars <- c(
@@ -46,10 +36,11 @@ recurring_vars <- c(
   "sst_mean",       
   "sbt_mean",       
   "sic_mean", 
+  "log_chla_mean",
   "sbt_sd",
   "sst_sd",
   "sic_sd", 
-  "log_chla_mean",
+  "log_chla_sd",
   "depth",
   "year",
   "longitude",
@@ -78,7 +69,6 @@ keep <- c(
 rm(list = setdiff(ls(), keep))
 
 ## ------------------------------------------------------------------------ ----
-
 ## General model ----
 
 # This is the model for biomass including the most data including 
@@ -120,12 +110,19 @@ general_data %>% # Pearson correlation
   as.data.frame.table(responseName = "Freq") %>%
   filter(!is.na(Freq), abs(Freq) > 0.65)
 
-# Correlated variables:
-#Var1     Var2       Freq       Choice
-#1 sst_mean sbt_mean  0.8112112 sbt_mean
-#2 sst_mean sic_mean -0.8251594 sic_mean
-#3 sst_mean   sic_sd -0.8267052
-#4 sic_mean   sic_sd  0.8740684 sic_mean
+# Correlated variables (arrow represents choice):
+
+# sst_mean   ->   sbt_mean
+# sic_mean   ->   sic_sd
+# log_chla_mean -> log_chla_sd 
+
+# Check diversity correlations
+general_data %>% 
+  select(teve, tric, kde_feve, kde_fric) %>%
+  cor(use = "pairwise.complete.obs") %>%
+  replace(lower.tri(., diag = TRUE), NA) %>%
+  as.data.frame.table(responseName = "Freq") %>%
+  filter(!is.na(Freq))
 
 general_data %>% select(
   kde_fric,
@@ -139,6 +136,7 @@ general_data %>% select(
   sst_sd,
   #sic_sd, 
   log_chla_mean,
+  #log_chla_sd,
   depth
   ) %>% vif() # All VIF values < 2
 
@@ -161,20 +159,44 @@ general_model <- model_selection(
     sst_sd +
     #sic_sd + 
     log_chla_mean +
+    #log_chla_sd +
     depth
   )
 
 # Prediction
 model_prediction(model = general_model,
-                 vars = c("teve", "sbt_mean"),
+                 vars = c("teve", "tric", "sbt_mean"),
                  name = "general_biomass",
                  directory = "figures/model_figures")
+
+# Refit with only one diversity metric at a time
+
+vars <- c("kde_fric", "kde_feve", "teve", "tric")
+
+for (var in vars) {
+  
+  model <- model_selection(
+    directory = "models/biomass",
+    name = paste0("only_", var, "_biomass"),
+    data = general_data,  
+    mesh_cutoff = 60, 
+    family = lognormal(link = "log"),
+    fixed_formula = as.formula(paste0( # this allows to loop the function
+      "total_biomass  ~ ", var, " + 
+      sbt_mean +
+      sic_mean +
+      sbt_sd +
+      sst_sd +        
+      log_chla_mean +
+      depth"
+      )))
+  
+}
 
 # Cleaning
 rm(list = setdiff(ls(), keep))
 
 ## ------------------------------------------------------------------------ ----
-
 ## Fishing model ----
 
 # This model investigates the effect of fishing, incorporating all areas and 
@@ -219,11 +241,10 @@ fishing_data %>% # Pearson correlation
   filter(!is.na(Freq), abs(Freq) > 0.65)
 
 # Correlated variables:
-#Var1     Var2       Freq       Choice
-#1 sst_mean sbt_mean  0.8566891 sbt_mean
-#2 sst_mean sic_mean -0.8188343 sic_mean
-#3 sst_mean   sic_sd -0.8322784
-#4 sic_mean   sic_sd  0.9059084 sic_mean
+
+# sst_mean  ->  sbt_mean
+# sic_mean  <-   sic_sd 
+# log_chla_mean -> log_chla_sd
 
 fishing_data %>% select(
   log_sum_fishing,
@@ -238,6 +259,7 @@ fishing_data %>% select(
   sst_sd,
   #sic_sd, 
   log_chla_mean,
+  #log_chla_sd,
   depth
   ) %>% vif() # All VIF values < 2
 
@@ -261,6 +283,7 @@ fishing_model <- model_selection(
     sst_sd +
     #sic_sd + 
     log_chla_mean +
+    #log_chla_sd +
     depth
   )
 
@@ -271,13 +294,12 @@ fishing_model <- model_selection(
 rm(list = setdiff(ls(), keep))
 
 ## ------------------------------------------------------------------------ ----
-
 ## Arctic model ----
 
 # This model focuses on Arctic areas
 
 # Identify Arctic data
-divide_arc <- quantile(final_data$sbt_mean, 0.25, na.rm = TRUE)
+divide_arc <- quantile(final_data$sbt_mean, 0.3, na.rm = TRUE)
 
 # Prepare Arctic data for exploration
 arctic_data <- final_data %>%
@@ -313,10 +335,10 @@ arctic_data %>% # Pearson correlation
   filter(!is.na(Freq), abs(Freq) > 0.65)
 
 # Correlated variables:
-#Var1      Var2       Freq       Choice
-#1 sst_mean  sic_mean -0.8677860 sic_mean
-#2 sst_mean    sic_sd -0.8081397 
-#3 sic_mean    sic_sd  0.8431559 sic_mean
+
+# sst_mean  ->  sic_mean
+#  sic_mean   <-   sic_sd
+# log_chla_mean <- log_chla_sd
 
 arctic_data %>% select( # VIF
   kde_fric,
@@ -330,6 +352,7 @@ arctic_data %>% select( # VIF
   sst_sd,
   #sic_sd, 
   log_chla_mean,
+  #log_chla_sd,
   depth
 ) %>% vif() # All VIF values < 2
 
@@ -352,17 +375,20 @@ arctic_model <- model_selection(
     sst_sd +
     #sic_sd + 
     log_chla_mean +
+    #log_chla_sd +
     depth
 )
 
-## ------------------------------------------------------------------------ ----
+# The residuals suggest potential non-linearities, but adding a smoothers to
+# non-linear drivers does not solve the issues.
 
+## ------------------------------------------------------------------------ ----
 ## Boreal model ----
 
 # This model focuses on Boreal areas
 
 # Identify Boreal data
-divide_bor <- quantile(final_data$sbt_mean, 0.75, na.rm = TRUE)
+divide_bor <- quantile(final_data$sbt_mean, 0.7, na.rm = TRUE)
 
 # Prepare Boreal data for exploration
 boreal_data <- final_data %>%
@@ -398,9 +424,10 @@ boreal_data %>% # Pearson correlation
   filter(!is.na(Freq), abs(Freq) > 0.65)
 
 # Correlated variables:
-#Var1     Var2       Freq       Choice
-#1 sst_mean sbt_mean  0.7911535 sbt_mean
-#2 sic_mean   sic_sd  0.9070993 neither, very few observations
+
+# sst_mean  ->  sbt_mean
+#  sic_mean   /   sic_sd - sic_mean
+# log_chla_mean <- log_chla_sd 
 
 boreal_data %>% select( # VIF
   kde_fric,
@@ -409,13 +436,18 @@ boreal_data %>% select( # VIF
   teve,      
   #sst_mean,       
   sbt_mean,       
-  #sic_mean, 
+  sic_mean, 
   sbt_sd,
   sst_sd,
   #sic_sd, 
   log_chla_mean,
+  #log_chla_sd,
   depth
 ) %>% vif() # all VIF < 2
+
+# How many sic values?
+table(boreal_data$sic_mean > 0)
+prop.table(table(boreal_data$sic_mean > 0))
 
 # Boreal model selection 
 boreal_model <- model_selection(
@@ -431,23 +463,19 @@ boreal_model <- model_selection(
     teve +      
     #sst_mean +      
     sbt_mean +       
-    #sic_mean + 
+    sic_mean + 
     sbt_sd +
     sst_sd +
     #sic_sd + 
     log_chla_mean +
+    #log_chla_sd +
     depth
 )
-
-# Selection failed for spatial_random_fields_with_anisotropy,
-# but it would probably not be selected as the best structure given that 
-# spatiotemporal random fields are favoured in all the other models
 
 # Cleaning
 rm(list = setdiff(ls(), keep))
 
 ## ------------------------------------------------------------------------ ----
-
 ## 2004_2011 model ----
 
 # This model focuses on the first (coldest) time period identifies by
@@ -488,11 +516,10 @@ data_2004_2011 %>% # Pearson correlation
   filter(!is.na(Freq), abs(Freq) > 0.65)
 
 # Correlated variables:
-#Var1     Var2       Freq       Choice
-#1 sst_mean sbt_mean  0.7685743 sbt_mean
-#2 sst_mean sic_mean -0.8326126 sic_mean
-#3 sst_mean   sic_sd -0.8256690 
-#4 sic_mean   sic_sd  0.8605019 sic_mean
+
+# sst_mean  ->  sbt_mean 
+# sic_mean   <-   sic_sd
+# log_chla_mean <- log_chla_sd
 
 data_2004_2011 %>% select( # VIF
   kde_fric,
@@ -506,8 +533,9 @@ data_2004_2011 %>% select( # VIF
   sst_sd,
   #sic_sd, 
   log_chla_mean,
+  #log_chla_sd,
   depth
-) %>% vif() # sic_mean is just slightly above the treshold, so it is maintained
+) %>% vif() 
 
 # Select 2004_2011 model
 model_2004_2011 <- model_selection(
@@ -528,11 +556,11 @@ model_2004_2011 <- model_selection(
     sic_mean + 
     #sic_sd +       
     log_chla_mean +
+    #log_chla_sd +
     depth
   )
 
 ## ------------------------------------------------------------------------ ----
-
 ## 2012_2016 model ----
 
 # This model focuses on the second (warmest) time period identifies by
@@ -572,11 +600,10 @@ data_2012_2016 %>% # Pearson correlation
   filter(!is.na(Freq), abs(Freq) > 0.65)
 
 # Correlated variables:
-#Var1     Var2       Freq       Choice
-#1 sst_mean sbt_mean  0.8349426 sbt_mean
-#2 sst_mean sic_mean -0.7548561 sic_mean
-#3 sst_mean   sic_sd -0.7666632 
-#4 sic_mean   sic_sd  0.8682476 sic_mean
+
+# sst_mean  ->  sbt_mean
+# sic_mean   <-   sic_sd
+# log_chla_mean <- log_chla_sd
 
 data_2012_2016 %>% select( # VIF
   kde_fric,
@@ -590,11 +617,12 @@ data_2012_2016 %>% select( # VIF
   sst_sd,
   #sic_sd, 
   log_chla_mean,
+  #log_chla_sd,
   depth
 ) %>% vif() # All VIF values < 2
 
-# Select 2012_2016 model
-model_2012_2016 <- model_selection(
+# Select 2012_2016 model 
+model_2012_2016 <- model_selection( 
   directory = "models/biomass",
   name = "2012_2016_biomass",
   data = data_2012_2016,
@@ -612,11 +640,11 @@ model_2012_2016 <- model_selection(
     sic_mean + 
     #sic_sd +       
     log_chla_mean +
+    #log_chla_sd +
     depth
 )
 
 ## ------------------------------------------------------------------------ ----
-
 ## 2017_2022 model ----
 
 # This model focuses on the third (cooler) time period identifies by
@@ -624,7 +652,6 @@ model_2012_2016 <- model_selection(
 
 data_2017_2022 <- filter(final_data, year > 2016) %>% # cooler period
   select(all_of(recurring_vars)) %>%
-  drop_na()  %>%
   drop_na() %>%
   mutate(across(
     -c(
@@ -656,12 +683,10 @@ data_2017_2022 %>% # Pearson correlation
   filter(!is.na(Freq), abs(Freq) > 0.65)
 
 # Correlated variables:
-#Var1     Var2       Freq       Choice
-#1 sst_mean sbt_mean  0.8728749 sbt_mean
-#2 sst_mean sic_mean -0.8686514 
-#3 sst_mean   sic_sd -0.8842051
-#4 sbt_mean   sic_sd -0.6711975 sbt_mean
-#5 sic_mean   sic_sd  0.9257741 sic_mean
+
+# sst_mean  ->  sbt_mean
+# sic_mean   <-   sic_sd 
+# log_chla_mean <- log_chla_sd
 
 data_2017_2022 %>% select( # VIF
   kde_fric,
@@ -675,16 +700,18 @@ data_2017_2022 %>% select( # VIF
   sst_sd,
   #sic_sd, 
   log_chla_mean,
+  #log_chla_sd,
   depth
-) %>% vif() # sic_mean is above two, but not my much. Keep to favour comparisons
+) %>% vif() # sic_mean is above two
 
-# Select 2017_2022 model
-model_2017_2022 <- model_selection(
+# Select 2017_2022 model (manual because of an error)
+model_2017_2022 <- manual_model_selection( 
   directory = "models/biomass",
   name = "2017_2022_biomass",
   data = data_2017_2022,
-  mesh_cutoff = 60, 
+  mesh_cutoff = 55, # sanity check fails at 60, so we use 55
   family = lognormal(link = "log"),
+  random_selection = "spatiotemporal_random_fields_ar1",
   fixed_formula = total_biomass ~  
     kde_fric +
     kde_feve +
@@ -694,9 +721,10 @@ model_2017_2022 <- model_selection(
     sbt_sd +
     #sst_mean +
     sst_sd +
-    sic_mean + 
+    #sic_mean + 
     #sic_sd +       
     log_chla_mean +
+    #log_chla_sd +
     depth
 )
 
@@ -704,125 +732,260 @@ model_2017_2022 <- model_selection(
 rm(list = setdiff(ls(), keep))
 
 ## ------------------------------------------------------------------------ ----
-
 ## Partial biomass models ----
 
-# These models investigate the effect of the progressiveremoval of 
+# These models investigate the effect of the progressive removal of 
 # dominant species from the total_biomass. 
 # Note that data exploration is the same as general_model
 
-# Prepare data
-b_data <- final_data
-
-sp <- c("gadus_morhua",
-        "melanogrammus_aeglefinus",
-        "sebastes_mentella",
-        "micromesistius_poutassou",
-        "hippoglossoides_platessoides",
-        "mallotus_villosus",
-        "pollachius_virens",
-        "boreogadus_saida",
-        "trisopterus_esmarkii",
-        "reinhardtius_hippoglossoides")
-
 new_res <- paste0("remove_", 1:10)
 
-for (i in 1:length(new_res)) {
-  b_data[[new_res[i]]] <- b_data[["total_biomass"]] - rowSums(b_data[sp[1:i]])
+# Prepare data
+biomass_data <- final_data %>%
+  select(         
+    all_of(recurring_vars),
+    starts_with("remove"),
+    log_sum_fishing
+  ) 
+
+# Responses distribution
+par(mfrow = c(3, 4), mar = c(2, 4, 2, 1)) 
+
+for (i in 1:length(new_res)) { 
+  
+  plot(density(log(biomass_data[[paste0(new_res[i], "_biomass")]])),
+       main = paste0(new_res[i], "_biomass"))
 }
 
-biomass_data <- b_data %>%
-  select(  
-    all_of(new_res),         
-    all_of(recurring_vars)
-  ) %>%
-  drop_na() %>%
+par(mfrow = c(1, 1)) 
+
+# Collinearity (vif only)
+for (i in 1:length(new_res)) { 
+  
+  message(new_res[i])
+  
+  x <- final_data %>%
+    select(
+      paste0(new_res[i], "_tric"),
+      paste0(new_res[i], "_teve"),
+      paste0(new_res[i], "_kde_fric"),
+      paste0(new_res[i], "_kde_feve"),
+      "sbt_mean",
+      "sbt_sd",
+      "sst_sd",
+      #"sic_mean",
+      "depth",
+      "log_chla_mean",
+      "log_sum_fishing"
+    ) %>%
+    drop_na() %>%
+    vif()
+  
+  print(x)
+  
+}
+
+# In some data sets sic_mean and/or sbt_mean surpass the VIF threshold 
+# We remove sic_mean from all models to keep them comparable and remove all
+# excessive correlations. sic_mean was not a driver in the general model and 
+# does not become an important one in the partial biomass models if kept.
+
+# Models
+for (i in 1:length(new_res)) { 
+  
+  # Identify new response
+  response <- paste0(new_res[i], "_biomass")
+  
+  data <- biomass_data %>%
+    select(
+      paste0(new_res[i], c(
+        "_biomass",
+        "_kde_fric",
+        "_kde_feve",
+        "_tric",
+        "_teve")),
+      sbt_mean,
+      sbt_sd,
+      sst_sd,
+      #sic_mean,        
+      log_chla_mean,
+      depth,
+      log_sum_fishing, 
+      haul_id,
+      year, 
+      latitude,
+      longitude) %>%
+    drop_na() %>%
+    filter(.data[[response]] > 0) %>%
+    mutate(
+      across(
+        -c(
+          ends_with("biomass"),
+          haul_id,
+          year, 
+          latitude,
+          longitude
+        ), ~ as.numeric(scale(.)))) 
+  
+  # Fitting 
+  model <- model_selection(
+    directory = "models/biomass",
+    name = response,
+    data = data,
+    mesh_cutoff = 60, 
+    family = lognormal(link = "log"),
+    fixed_formula = as.formula(paste0( # this allows to loop the function
+      new_res[i], "_biomass  ~", 
+      new_res[i], "_kde_fric +",
+      new_res[i], "_kde_feve +",
+      new_res[i], "_tric +",
+      new_res[i], "_teve + 
+      sbt_mean +
+      sbt_sd +
+      sst_sd +        
+      log_chla_mean +
+      depth +
+      log_sum_fishing"
+      )))
+  
+  # Return remove_10_model to visualize predictions
+  if(formula(model)[[2]] == "remove_10_biomass") {
+    
+    remove_10_biomass_model <- model
+    
+    return(remove_10_biomass_model)
+  }
+  
+  message(
+    "\n======================================================================\n",
+    paste0(new_res[i], " model fitted and inspected"),
+    "\n======================================================================\n"
+    )
+  
+}
+
+# Check remove_10 model predictions for tric, teve, and sbt_mean
+model_prediction(model = remove_10_biomass_model,
+                 name = "remove_10_biomass_model",
+                 vars = c("remove_10_teve", "remove_10_tric", "sbt_mean"),
+                 directory = "figures/model_figures")
+
+# Residuals indicate the presence of some non-linear relationships. This seems
+# to be potentially problematic only for teve and tric, so we refit the models
+# with smoothers and check 
+
+remove_10_biomass_gamm_model <- model_selection(
+  directory = "models/biomass",
+  name = "remove_10_biomass_gamm",
+  data = remove_10_biomass_model$data,
+  mesh_cutoff = 60, 
+  family = lognormal(link = "log"),
+  fixed_formula = remove_10_biomass  ~ 
+    remove_10_kde_fric +
+    remove_10_kde_feve +
+    s(remove_10_tric) +
+    s(remove_10_teve) + 
+      sbt_mean +
+      sbt_sd +
+      sst_sd +        
+      log_chla_mean +
+      depth +
+      log_sum_fishing
+  )
+
+# Check remove_10 model (gamm) predictions for tric and teve
+model_prediction(model = remove_10_biomass_gamm_model,
+                 name = "remove_10_biomass_gamm_model",
+                 vars = c("remove_10_teve", "remove_10_tric"),
+                 directory = "figures/model_figures")
+
+# Overall, the gamm has a better fit, but the difference in the predictions
+# is minor. Given that the aim is to compare across models, we can accept a
+# slightly worse fit (due to minor non-linearities) to maintain high 
+# comparabiliy
+
+# Merge all pdfs
+pdf_combine(
+  input = c(
+    paste0("models/biomass/", new_res, "_biomass_model_selection.pdf"),
+    "models/biomass/remove_10_biomass_gamm_model_selection.pdf"),
+  output = "models/biomass/partial_biomass_models_selection.pdf"
+)
+
+# Cleaning
+file.remove(
+  c(
+    paste0("models/biomass/", new_res, "_biomass_model_selection.pdf"),
+    "models/biomass/remove_10_biomass_gamm_model_selection.pdf",
+    "models/biomass/remove_10_biomass_gamm_model_coefficients.csv")
+)
+
+# Partial biomass models using the same diversity metrics  
+partial_data <- final_data %>%
+  select(all_of(recurring_vars),
+         log_sum_fishing,
+         ends_with("biomass")) %>%
   mutate(across(
-    starts_with("remove_"),
-    ~ .x + 0.0001), # few observations are slightly negative due to rounding
-         across(
+    ends_with("biomass"),
+    ~ replace(., . < 1e-5, NA)
+  )) %>%
+  drop_na() %>%
+  mutate(
+    across(
     -c(
-      starts_with("remove_"),
+      ends_with("biomass"),
       haul_id,
       total_biomass,
       year, 
       latitude,
       longitude
-    ), ~ as.numeric(scale(.)))) 
+    ), ~ as.numeric(scale(.))))
 
-# Responses distribution
-par(mfrow = c(3, 4), mar = c(2, 4, 2, 1)) 
-
-for(i in seq_along(new_res)) {
+for (i in 1:length(new_res)) { 
   
-  plot(density(log(biomass_data[[new_res[i]]])),
-       main = new_res[i])
-}
-
-par(mfrow = c(1, 1)) 
-
-# Collinearity is the same as general model
-
-# Models
-for (i in 1:length(new_res)) {
-  
-  name <- paste0(new_res[i], "_biomass")
-  
-  # Fitting
+  # Fitting 
   model <- model_selection(
     directory = "models/biomass",
-    name = name,
-    data = biomass_data,
+    name = paste0(new_res[i], "_samediv_biomass"),
+    data = partial_data,
     mesh_cutoff = 60, 
     family = lognormal(link = "log"),
     fixed_formula = as.formula(paste0( # this allows to loop the function
-      new_res[i],
-      "  ~  
+      new_res[i], "_biomass  ~
       kde_fric +
       kde_feve +
       tric +
       teve + 
       sbt_mean +
       sbt_sd +
-      sst_sd +
-      sic_mean +        
+      sst_sd +        
       log_chla_mean +
-      depth"
-      )))
+      depth +
+      log_sum_fishing"
+    )))
   
-  # Return remove_10_model to visualize predictions
-  if(formula(model)[[2]] == "remove_10") {
-    
-    remove_10_model <- model
-    
-    return(remove_10_model)
-  }
-  
-  message(paste0(name, " model fitted and inspected"))
+  message(
+    "\n======================================================================\n",
+    paste0(new_res[i], " (same diversity) model fitted and inspected"),
+    "\n======================================================================\n"
+  )
   
 }
 
-# Check remove_10 model predictions for tric and teve
-model_prediction(model = remove_10_model,
-                 name = "remove_10_biomass_model",
-                 vars = c("tric", "teve"),
-                 directory = "figures/model_figures")
-
 # Merge all pdfs
 pdf_combine(
-  input = paste0("models/biomass/", new_res, "_biomass_model_selection.pdf"),
-  output = "models/biomass/partial_biomass_models_selection.pdf"
+  input = paste0("models/biomass/", new_res, "_samediv_biomass_model_selection.pdf"),
+  output = "models/biomass/partial_biomass_same_diversity_models_selection.pdf"
 )
 
 # Cleaning
 file.remove(
-  paste0("models/biomass/", new_res, "_biomass_model_selection.pdf")
-)
+  paste0("models/biomass/", new_res, "_samediv_biomass_model_selection.pdf"))
+
 
 rm(list = setdiff(ls(), keep))
 
 ## ------------------------------------------------------------------------ ----
-
 ## General model with Pielou's evenness ----
 
 # This model uses Pielou's taxonomic evenness rather than Simpson's to 
@@ -855,11 +1018,10 @@ pielou_data %>% # Pearson correlation
   filter(!is.na(Freq), abs(Freq) > 0.65)
 
 # Correlated variables:
-#Var1     Var2       Freq       Choice
-#1 sst_mean sbt_mean  0.8112112 sbt_mean
-#2 sst_mean sic_mean -0.8251594 
-#3 sst_mean   sic_sd -0.8267052 
-#4 sic_mean   sic_sd  0.8740684 sic_mean
+
+# sst_mean   -> sbt_mean
+# sic_mean   <-   sic_sd
+#  log_chla_mean <- log_chla_sd
 
 pielou_data %>% select(
   kde_fric,
@@ -873,6 +1035,7 @@ pielou_data %>% select(
   sst_sd,
   #sic_sd, 
   log_chla_mean,
+  #log_chla_sd,
   depth
 ) %>% vif() # All VIF values < 2
 
@@ -895,104 +1058,11 @@ pielou_model <- model_selection(
     sst_sd +
     #sic_sd + 
     log_chla_mean +
+    #log_chla_sd +
     depth
 )
 
 # Cleaning
-rm(list = setdiff(ls(), keep))
-
-## ------------------------------------------------------------------------ ----
-
-## Partial biomass models with Pielou's evenness ----
-
-# These models use Pielou's taxonomic evenness rather than Simpson's to 
-# investigate  whole-community effects while removing top species
-
-b_data <- final_data
-
-sp <- c("gadus_morhua",
-        "melanogrammus_aeglefinus",
-        "sebastes_mentella",
-        "micromesistius_poutassou",
-        "hippoglossoides_platessoides",
-        "mallotus_villosus",
-        "pollachius_virens",
-        "boreogadus_saida",
-        "trisopterus_esmarkii",
-        "reinhardtius_hippoglossoides")
-
-new_res <- paste0("remove_", 1:10)
-
-for (i in 1:length(new_res)) {
-  b_data[[new_res[i]]] <- b_data[["total_biomass"]] - rowSums(b_data[sp[1:i]])
-}
-
-biomass_data <- b_data %>%
-  select(  
-    all_of(new_res),         
-    all_of(recurring_vars),
-    p_teve
-  ) %>%
-  drop_na() %>%
-  mutate(across(
-    starts_with("remove_"),
-    ~ .x + 0.0001), # few observations are slightly negative due to rounding
-    across(
-      -c(
-        starts_with("remove_"),
-        haul_id,
-        total_biomass,
-        year, 
-        latitude,
-        longitude
-      ), ~ as.numeric(scale(.)))) 
-
-# Collinearity is the same as pielou model
-
-# Models
-for (i in 1:length(new_res)) {
-  
-  name <- paste0("pielou_", new_res[i], "_biomass")
-  
-  # Fitting
-  model <- model_selection(
-    directory = "models/biomass",
-    name = name,
-    data = biomass_data,
-    mesh_cutoff = 60, 
-    family = lognormal(link = "log"),
-    fixed_formula = as.formula(paste0( # this allows to loop the function
-      new_res[i],
-      "  ~  
-      kde_fric +
-      kde_feve +
-      tric +
-      p_teve + 
-      sbt_mean +
-      sbt_sd +
-      sst_sd +
-      sic_mean +        
-      log_chla_mean +
-      depth"
-    )))
-  
-  message(paste0(name, " model fitted and inspected"))
-  
-}
-
-# Merge all validation pdfs
-pdftools::pdf_combine(
-  input = c(paste0("models/biomass/pielou_", new_res,
-                   "_biomass_model_selection.pdf")),
-  output = "models/biomass/pielou_partial_biomass_models_selection.pdf"
-)
-
-# Cleaning
-file.remove(
-  paste0("models/biomass/pielou_", new_res, 
-         "_biomass_model_selection.pdf")
-)
-
 rm(list = setdiff(ls(), keep))
 
 ## ------------------------------------------------------------------------ ----
@@ -1002,7 +1072,7 @@ rm(list = setdiff(ls(), keep))
 
 # Prepare data of the whole study area (all) for exploration
 other_fd_data <- final_data %>%
-  select(all_of(recurring_vars), starts_with("ch"), -starts_with("kde")) %>%
+  select(all_of(recurring_vars), starts_with("ch_"), -starts_with("kde")) %>%
   drop_na() %>%
   mutate(across(
     -c(
@@ -1036,17 +1106,16 @@ other_fd_data %>% # Pearson correlation
   filter(!is.na(Freq), abs(Freq) > 0.65)
 
 # Correlated variables:
-#Var1     Var2       Freq             Choice
-#1      sst_mean  sbt_mean  0.8129230 sbt_mean
-#2      sst_mean  sic_mean -0.8254482 
-#3      sst_mean    sic_sd -0.8258865
-#4      sic_mean    sic_sd  0.8743660 sic_mean
-#8          tric   ch_fric  0.6975578 ch_fric
+
+# sst_mean   ->  sbt_mean
+# sic_mean   <-   sic_sd
+# log_chla_mean <- log_chla_sd
+# tric  ->   ch_fric 
 
 other_fd_data %>% select(
   ch_fric,
   ch_feve,
-  tric,    
+  #tric,    
   teve,         
   #sst_mean,       
   sbt_mean,       
@@ -1055,8 +1124,10 @@ other_fd_data %>% select(
   sst_sd,
   #sic_sd, 
   log_chla_mean,
+  #log_chla_sd,
   depth
-) %>% vif() # tric shares a small collinearity with ch_fric
+) %>% vif() # tric shares a small collinearity with ch_fric, but they are 
+            # both maintained to favor comparisons
 
 # Selection
 other_fd_model <- model_selection(
@@ -1068,7 +1139,7 @@ other_fd_model <- model_selection(
   fixed_formula = total_biomass ~  
     ch_fric +
     ch_feve +      
-    tric +
+    #tric +
     teve +     
     #sst_mean +      
     sbt_mean +       
@@ -1077,6 +1148,7 @@ other_fd_model <- model_selection(
     sst_sd +
     #sic_sd + 
     log_chla_mean +
+    #log_chla_sd +
     depth
 )
 
@@ -1092,6 +1164,10 @@ csv_files <- list.files(
   full.names = TRUE
 )
 
+csv_files <- csv_files[
+  csv_files != "models/biomass/biomass_models_coefficients.csv"
+]
+
 combined_csv <- bind_rows(lapply(csv_files, read.csv)) |>
   filter(term !="(Intercept)")
 
@@ -1100,6 +1176,8 @@ write.csv(combined_csv,
 
 # Cleaning
 file.remove(csv_files)
+
+rm(list = ls())
 
 # End
 

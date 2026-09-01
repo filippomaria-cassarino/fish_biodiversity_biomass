@@ -17,12 +17,8 @@ install_load_packages(
     "ggplot2",
     "ggbreak", # breaks in x axis scale
     "tibble",
-    "GGally",
-    "mFD",
-    "BAT",
     "janitor",
-    "sf",
-    "sdmTMB"
+    "sf"
   ))
 
 ## Community data cleaning ----
@@ -52,13 +48,15 @@ nor_full <- data %>%
   dplyr::rename("taxon" = "accepted_name") # rename for clarity
 
 length(unique(nor_full$haul_id)) # 3932 hauls
-length(unique(nor_full$taxon))   # 108 species
+length(unique(nor_full$taxon))   # 108 taxa
 
 # Check haul_dur and depth distribution 
 haul_unique <- nor_full %>%
   distinct(haul_id, haul_dur, depth)
 
 hist(haul_unique$haul_dur, breaks = 100) # haul_dur should be ~ 15 minutes
+range(haul_unique$haul_dur) # 3.8 to 58 minutes
+sd(haul_unique$haul_dur) # 3.9 minutes
 hist(haul_unique$depth, breaks = 100) #  focus on depth below 500
 
 # Exclude large deviations from 15 minutes and non-shelf areas
@@ -68,98 +66,110 @@ community_filtered <- nor_full %>%
     depth < 500) 
 
 length(unique(community_filtered$haul_id)) # 3452 hauls
-length(unique(community_filtered$taxon))   # 106 species
+length(unique(community_filtered$taxon))   # 106 taxa
+
+# Study spatial and temporal range
+range(community_filtered$year)
+range(community_filtered$latitude)
+range(community_filtered$longitude)
+
+y_center <- round(mean(range(community_filtered$latitude, na.rm = TRUE)))
+x_center <- round(mean(range(community_filtered$longitude, na.rm = TRUE)))
+
+s <- community_filtered  %>% 
+  sf::st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
+  sf::st_transform(crs = paste0("+proj=laea +lat_0=", # equal area projection
+                                y_center,
+                                " +lon_0=",
+                                x_center,
+                                " +datum=WGS84 +units=km +no_defs")) %>%
+  st_union() %>%
+  st_convex_hull() %>%
+  st_area # 962217.3 [km^2]
 
 ## Save filtered community data ----
 save(community_filtered, file = "data/intermediate/community_filtered.RData")
 
 rm(list = setdiff(ls(), "community_filtered")) # cleaning
 
-## Check the effect of haul duration on species richness ----
+## Check if Sebastes species may inflate richness  ----
 
-# Haul duration may affect the number of species encountered, so here
-# tric is models as response to haul duration, including spatiotemporal
-# random fields for possible autocorrelations
+# Hauls with Sebastes genus
+sebastes <- community_filtered %>%
+  group_by(haul_id) %>%
+  summarise(
+    has_sebastes_genus = "Sebastes" %in% taxon) %>%
+  filter(has_sebastes_genus) %>%
+  summarise(n_hauls = n())
 
-# Load model selection function
-load("tools/model_selection_functions.RData")
+# Number of hauls containing any sebastes
+has_any_sebastes <- community_filtered %>%
+  group_by(haul_id) %>%
+  summarise(
+    has_sebastes = any(
+      taxon %in% c(
+        "Sebastes",
+        "Sebastes viviparus",
+        "Sebastes norvegicus",
+        "Sebastes mantella"
+      ))) %>%
+  filter(has_sebastes) %>%
+  summarise(n_hauls = n())
 
-# Extract midpoint of the spatial distribution
-y_center <- round(mean(range(community_filtered$latitude, na.rm = TRUE)))
-x_center <- round(mean(range(community_filtered$longitude, na.rm = TRUE)))
+# Number of hauls containing both Sebastes genus and species 
+overlap_sebastes <- community_filtered %>%
+  group_by(haul_id) %>%
+  summarise(
+    has_sebastes_genus = "Sebastes" %in% taxon,
+    has_species_species = any(
+      taxon %in% c(
+        "Sebastes viviparus",
+        "Sebastes norvegicus",
+        "Sebastes mantella"
+      ))) %>%
+  filter(has_sebastes_genus & has_species_species) %>%
+  summarise(n_hauls = n())
 
-# Prepare data
-duration_data <- community_filtered %>% 
-  group_by(
-    haul_id,
-    haul_dur,
-    year,  
-    latitude,
-    longitude
-  ) %>%
-  summarize(tric = length(num_cpua), .groups = "drop") %>% # richness
-  sf::st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
-  sf::st_transform(crs = paste0("+proj=aeqd +lat_0=", # project to aequidistant
-                                y_center,
-                                " +lon_0=",
-                                x_center,
-                                " +datum=WGS84 +units=km +no_defs")) %>%
-  mutate(latitude = st_coordinates(.)[, 2],      # extract latitude
-         longitude = st_coordinates(.)[, 1]) %>% # extract longitude
-  st_drop_geometry() %>% 
-  distinct(latitude, longitude, .keep_all = TRUE)
+# % of hauls where richness may be inflated by sebastes
+overlap_sebastes/length(unique(community_filtered$haul_id)) * 100 # 9.7%
 
-# Check distributions
-hist(duration_data$haul_dur, breaks = 100) 
-hist(duration_data$tric, breaks = 100) 
-
-# Fit model
-duration_model <- model_selection(
-  directory = "models/haul_duration",
-  name = "haul_duration",
-  data = duration_data,  
-  mesh_cutoff = 60, 
-  family = gaussian(link = "identity"),
-  fixed_formula = tric ~ haul_dur
-)
-
-# Wald test - H0: coefficient = 0
-w <- ((tidy(duration_model)[2, 2] / tidy(duration_model)[2, 3])[1, 1])^2
-1 - pchisq(w, df = 1) # retain H0
-
-# Predict
-load("tools/model_prediction_function.RData")
-
-model_prediction(
-  model = duration_model,
-  vars = "haul_dur",
-  name = "duration",
-  directory = "models/haul_duration"
-)
-
-# Model validation shows that assumptions are largely met. 
-# haul_dur has a minimal effect
-
-rm(list = setdiff(ls(), "community_filtered")) # cleaning
+# % of hauls where any sebastes occurs where there may be richness inflation
+overlap_sebastes/has_any_sebastes * 100 # 21.1% 
 
 ## Compute and visualize biomass ----
 
 # Compute total fish biomass per unit of area for each haul, then identify the
-# most abundan species and dominance structure
+# most abundant species and dominance structure
 
 # Unique taxa 
 length(unique(community_filtered$taxon)) # n = 106
 
-# Individual encountered by taxon
+# Individuals encountered by taxon
 rare_species <- community_filtered %>%    
-  group_by(taxon) %>%
+  group_by(taxon, rank) %>%
   summarize(number = sum(num, na.rm = TRUE)) %>%
   arrange(number)
+
+table(rare_species$rank)
+
+# Number of individuals resolved to each taxonomic level
+number_at_species <- rare_species %>%
+  group_by(rank)%>%
+  summarise(sum = sum(number)/sum(rare_species$number) * 100)
+
+# Number of greenland sharks
+rare_species[rare_species$taxon == "Somniosus microcephalus", ] # 11
 
 # Total biomass per haul 
 total_biomass <- community_filtered %>%    
   group_by(haul_id) %>%
   summarize(total_biomass = sum(wgt_cpua, na.rm = TRUE), .groups = "drop") 
+
+# Inspect 0 biomass haul
+no_biomass <- filter(community_filtered,
+                     haul_id == "2006702/4/2006/1173/2-25-2025")
+
+# Just 1 Macrourus berglax and no weight data. Remove haul. 
 
 # Total biomass by species
 spe_biomass <- community_filtered %>%    
@@ -195,7 +205,7 @@ p <- ggplot(data = new_spe, aes(x = biomass)) +
         panel.grid = element_blank())
 
 # Save plot
-ggsave(p, file = "figures/biomass_plots/dominance_figure.png", unit = "cm", 
+ggsave(p, file = "figures/dominance_figure.png", unit = "cm", 
        height = 7, width = 27)
 
 # Species biomass per haul
@@ -216,7 +226,7 @@ species_biomass <- community_filtered %>%
 # Most abundant species 
 top_10 <- spe_biomass$taxon %>% head(10)
 
-top_10
+save(top_10, file = "data/intermediate/top_10_species.RData")
 
 # Top 10 proportion of total
 sum(head(spe_biomass$biomass, 10)) / sum(spe_biomass$biomass) # 90% 
@@ -224,159 +234,27 @@ sum(head(spe_biomass$biomass, 10)) / sum(spe_biomass$biomass) # 90%
 # Cod proportion of total
 sum(head(spe_biomass$biomass, 1)) / sum(spe_biomass$biomass) # 31% 
 
-# Visualize changes in species biomass
-plot_data <- species_biomass %>%
-  group_by(year) %>%
-  summarise(
-    across(all_of(top_10), \(x) sum(x, na.rm = TRUE)),
-    total_biomass = sum(total_biomass, na.rm = TRUE)
-  ) %>%
-  mutate(
-    Others = total_biomass - rowSums(across(all_of(top_10)), na.rm = TRUE)
-  ) %>%
-  select(year, all_of(top_10), Others) %>%
-  pivot_longer(
-    -year,
-    names_to = "species",
-    values_to = "biomass"
-  )
-
-plot_data$species <- factor(plot_data$species, levels = c(top_10, "Others"))
-
-levels(plot_data$species) <- c(
-  "G. morhua",
-  "M. aeglefinus",
-  "S. mentella",
-  "M. poutassou",
-  "H. platessoides",
-  "M. villosus",
-  "P. virens",
-  "B. saida",
-  "T. esmarkii",
-  "R. hippoglossoides",
-  "Others")
-
-cols <- c(colorRampPalette(c("#2C3E50","#03A9F4", "#E2F4C7"))(10),
-          "gray50")
-
-p <- ggplot(
-  plot_data,
-  aes(
-    x = year,
-    y = biomass,
-    fill = species
-  )
-) +
-  geom_area(position = "fill") +
-  geom_line(position = "fill", color = "gray30", linewidth = 0.1) +
-  scale_y_continuous(labels = scales::percent) +
-  scale_fill_manual(values = cols) +
-  labs(
-    x = "Year",
-    y = "Proportion of total biomass",
-    fill = "Species"
-  ) +
-  theme_minimal(base_size = 14)
-
-# Save plot
-ggsave(p, file = "figures/biomass_plots/top_species_biomass.png",
-       unit = "cm", height = 16, width = 25)
+# Cod and haddock proportion of total
+sum(head(spe_biomass$biomass, 2)) / sum(spe_biomass$biomass) # 44% 
 
 # Merge to have total biomass and top 10 species by haul
-biomass <- species_biomass %>%
+b <- species_biomass %>%
   select(c("haul_id", "total_biomass", all_of(top_10))) %>%
+  filter(!haul_id == "2006702/4/2006/1173/2-25-2025") 
+
+# Compute total biomass when progressively excluding top 10 species
+new_res <- paste0("remove_", 1:10, "_biomass")
+
+for (i in 1:length(new_res)) {
+  b[[new_res[i]]] <- b[["total_biomass"]] - rowSums(b[top_10[1:i]])
+}
+
+biomass <- b %>%
   janitor::clean_names()
 
 ## Save biomass data ----
 save(biomass, file = "data/intermediate/biomass.RData")
 
 rm(list = ls())
-
-## Plotting biomass distribution (WORK IN PROGRESS) ----
-
-# Load theme and land contours
-load("tools/mapping_objects.RData")
-
-# Data for the plot
-biomass_plot_data <- community_filtered %>%
-  group_by(haul_id, year, latitude, longitude) %>%
-  summarize(depth = median(depth)) %>%
-  left_join(biomass, by = "haul_id") %>%
-  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
-  st_transform(crs = "+proj=laea +lat_0=75 +lon_0=30 +datum=WGS84 +units=km +no_defs") 
-
-# Continuous grid to bin the observations (65 km cells)
-g <- biomass_plot_data %>%
-  st_make_grid(cellsize = 64.82,  # 35 nautical miles in km
-               what = "polygons",
-               square = TRUE, 
-               offset = c(-483, -573)) %>% # center the cells
-  st_sf() 
-
-# Spatial join (inner join) to match observations to cells
-grid_r <- st_join(g, biomass_plot_data, left = FALSE) 
-
-# Check observation number per cell (ideally = n of years)
-cell_counts <- grid_r%>%
-  group_by(geometry) %>%
-  summarize(n_obs = n(), .groups = "drop")
-
-prop.table(table((cell_counts$n_obs > 5))) # ~ 80% has more than 5 observations
-
-# responses to plot
-res <- names(biomass[2:12])
-titles <- c("Total biomass", top_10$taxon)
-
-# Plot limits
-xlim <- st_bbox(biomass_plot_data)[c(1, 3)] + c(-65, 65)
-ylim <- st_bbox(biomass_plot_data)[c(2, 4)] + c(-65, 65)
-
-# Compute mean values over the study area, plot and save
-for (i in 1:length(res)) { 
-  
-  grid_mean <- grid_r %>%
-    group_by(geometry) %>%
-    summarize(x = mean(get(res[i]), na.rm = TRUE)) %>%
-    st_as_sf()
-  
-  max <- round(max(log(grid_mean$x + 1)) * 10)/10
-  min <- round(min(log(grid_mean$x + 1)) * 10)/10
-  
-  p <- ggplot() +
-    geom_sf(data = grid_mean, aes(fill = log(x + 1)), color = NA) +
-    geom_sf(data = land, fill = "gray45", color = "gray45") +
-    scale_x_continuous(limits = xlim) +
-    scale_y_continuous(limits = ylim) +
-    scale_fill_gradientn(colors = c("darkblue", "white", "darkred"),
-                         values = scales::rescale(c(min, max)),
-                         limits = c(min, max), 
-                         name = "log(kg/km2)",
-                         breaks = seq(min, max, length = 3)) + 
-    labs(x = "\nLongitude", y = "Latitude\n",
-         title = titles[i]) + 
-    guides(fill = guide_colorbar(barwidth = .5,
-                                 barheight = 10,
-                                 ticks.linewidth = .1)) +
-    theme_custom() 
-  
-  ggsave(p, file = paste0("figures/biomass_plots/", i - 1, "_mean_", res[i], ".png"),
-         width = 15, height = 10, units = "cm")
-}
-
-# Plot the number of hauls included in each cell and save
-p <- ggplot() +
-  geom_sf(data = cell_counts, fill = "white", color = "black", size = 0.3) +  
-  geom_sf(data = land, fill = "gray45", color = "gray45", alpha = 0.3) +  
-  geom_sf_text(data = cell_counts, aes(label = n_obs), size = 2, color = "black") +  
-  scale_x_continuous(limits = xlim) +
-  scale_y_continuous(limits = ylim) +
-  labs(
-    x = "\nLongitude", y = "Latitude\n",
-    title = "Hauls per Grid Cell"
-  ) +
-  theme_custom() 
-
-ggsave(p, file = "figures/biomass_plots/haul_number.png",
-         width = 15, height = 10, units = "cm")
 
 ## End

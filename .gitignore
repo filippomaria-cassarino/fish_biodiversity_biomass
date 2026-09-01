@@ -2,6 +2,25 @@
 .Rhistory
 .RData
 .Ruserdata
-data/original
-data/intermediate
 
+## Share only essential data that can't be obtained through the script
+
+data/original/*
+
+# re-include the folder itself
+!data/original/
+
+# include 2022 community data, which is not in FishGlob_data
+!data/original/BESS_data2022.RData
+
+# include GFW fishing data, which recently had download issues
+!data/original/fishing_data.RData
+
+# include trait data
+!data/original/TraitCollectionFishNAtlanticNEPacificContShelf.csv
+
+data/intermediate/*
+
+
+
+.positai

@@ -38,12 +38,7 @@ full_data <- biomass %>%
 ## Check distributions ----
 
 # Variables distribution 
-vars <- setdiff(colnames(full_data), c(
-  "year",
-  "latitude",
-  "longitude",
-  "haul_id"
-))
+vars <- setdiff(colnames(full_data), "haul_id")
 
 par(mfrow = c(4, 4), mar = c(2, 4, 2, 1))
 
@@ -53,22 +48,23 @@ for(i in seq_along(vars)) {     # biomass, chla, and fishing are skewed
           main = vars[i])
 }
 
-par(mfrow = c(1, 1))
-
 # Transform where necessary
 full_data_2 <- full_data %>% 
   mutate(
     log_chla_mean = log(chla_mean),
+    log_chla_sd = log(chla_sd),
     log_sum_fishing = log(sum_fishing + .01)
   )
 
-vars <- c("log_chla_mean", "log_sum_fishing")
+vars <- c("log_chla_mean", "log_chla_sd", "log_sum_fishing")
 
 for(i in seq_along(vars)) {     # biomass, chla, and fishing are skewed
   boxplot(full_data_2[[vars[i]]],
           horizontal = TRUE,
           main = vars[i])
 }
+
+par(mfrow = c(1, 1))
 
 ## Check duplicate coordinates ----
 
