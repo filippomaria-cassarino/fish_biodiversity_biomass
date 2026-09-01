@@ -1,7 +1,9 @@
 # Fish diversity, biomass, and human pressures
 
 This repository contains the data and code that I developed for 
-my master's thesis project. In this current version, they are used to
+the manuscript "Species dominance, functional richness and bottom temperature 
+associate with fish community biomass in the Barents Sea". 
+In this current version, they are used to
 model the response of fish biomass to fish diversity, fishing, and climate change 
 in the Barents Sea.
 
@@ -9,45 +11,32 @@ in the Barents Sea.
 
 Original data includes:
 
-1) Fish abundance and biomass data from the Barents Sea Ecosystem Survey
-(Eriksen et al., 2018). The data is stored in RData files named 
-NOR-BTS_clean.RData (2004-2021) and BESS_data2022.RData (2022). The first file
-was retrieved from the FISHGLOB_data dataset by Maureaud et al. (2024)
-(https://github.com/fishglob/FishGlob_data), while the latter was shared
-directly by Laurene Pecuchet since it has not been incorporated to FISHGLOB_data
-yet.
+1) Fish abundance and biomass data from the Barents Sea Ecosystem Survey for year 2022 (data/original/BESS_data2022.RData). The rest of the survey data (2004-2021) is imported directly from its GitHub repo (https://github.com/fishglob/FishGlob_data) (Eriksen et al., 2018; Maureaud et al., 2024).
 
-2) Functional trait information (Beukhof et al., 2019) in a csv file named
-trait_beukhof.csv
+2) Functional trait information in a csv file named
+data/original/TraitCollectionFishNAtlanticNEPacificContShelf.csv (Beukhof et al., 2019).
 
-3) Oceanographic data from the E.U. Copernicus Marine Service, which is not 
-available here because of its size. This data was compiled from
-the Global Ocean Physics Reanalysis (https://doi.org/10.48670/moi-00021), where 
+3) Fishing effort data from the Global Fishing Watch (Kroodsma et al., 2018),
+which is obtained directly through the code (see code/3_environment.R)
+but may change due to updates, so it is also found in this repo with the name data/original/fishing_data.RData.
+See the guide available here: https://github.com/GlobalFishingWatch/gfwr. 
+
+NOTE: Oceanographic data from the E.U. Copernicus Marine Service, which is not 
+available here because of its size, is obtained directly through the code (see code/3_environment.R).
+This data is compiled from the Global Ocean Physics Reanalysis (https://doi.org/10.48670/moi-00021), where 
 it was downloaded as mean monthly values at a 0.083° resolution, and from 
 Global Ocean Colour (https://doi.org/10.48670/moi-00281) at a 4km resolution.
-In both cases, the geographical range of the data to download was selected in 
-order to cover all sampling locations of the biological data.
-
-4) Fishing effort data from the Global Fishing Watch (Kroodsma et al., 2018),
-which is not available here because of its excessive size, but can be 
-obtained following the code section titled 4_fishing.R and the guide available 
-here: https://github.com/GlobalFishingWatch/gfwr. 
-
-All intermediate and final data is available.
 
 ## Code
 
 File 0 (0_functions.R) produces the custom functions used in the 
 analysis.
 
-Files 1-5 explore and prepare the data.
+Files 1-4 explore and prepare the data.
 
-Files 6-7 model the relationships under investigation.
+Files 5-6 model the relationships under investigation.
 
-File 8 produces the main figures.
-
-This section is currently under revision. Further details and references will
-be made available once the code is finalized.
+File 7 produces the main figures and tables.
 
 ## References
 Beukhof, E., Dencker, T. S., Palomares, M. L. D., & Maureaud, A. (2019). 
