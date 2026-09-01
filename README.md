@@ -13,21 +13,19 @@ Original data includes:
 
 1) Fish abundance and biomass data from the Barents Sea Ecosystem Survey for year 2022 (data/original/BESS_data2022.RData). The rest of the survey data (2004-2021) is imported directly from its GitHub repo (https://github.com/fishglob/FishGlob_data) (Eriksen et al., 2018; Maureaud et al., 2024).
 
-3) Functional trait information in a csv file named
+2) Functional trait information in a csv file named
 data/original/TraitCollectionFishNAtlanticNEPacificContShelf.csv (Beukhof et al., 2019).
+
+3) Fishing effort data from the Global Fishing Watch (Kroodsma et al., 2018),
+which is obtained directly through the code (see code/3_environment.R)
+but may change due to updates, so it is also found in this repo with the name data/original/fishing_data.RData.
+See the guide available here: https://github.com/GlobalFishingWatch/gfwr. 
 
 NOTE: Oceanographic data from the E.U. Copernicus Marine Service, which is not 
 available here because of its size, is obtained directly through the code (see code/3_environment.R).
 This data is compiled from the Global Ocean Physics Reanalysis (https://doi.org/10.48670/moi-00021), where 
 it was downloaded as mean monthly values at a 0.083° resolution, and from 
 Global Ocean Colour (https://doi.org/10.48670/moi-00281) at a 4km resolution.
-
-5) Fishing effort data from the Global Fishing Watch (Kroodsma et al., 2018),
-which is also obtained directly through the code (see code/3_environment.R)
-but may change due to updates, so it is also found in this repo with the name data/original/fishing_data.RData.
-See the guide available here: https://github.com/GlobalFishingWatch/gfwr. 
-
-All intermediate and final data is available.
 
 ## Code
 
